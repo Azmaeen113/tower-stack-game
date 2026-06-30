@@ -63,7 +63,11 @@
   .timer-fill {
     height: 100%; width: 0%; border-radius: 6px;
     background: linear-gradient(90deg, #4fc3ff, #b07bff, #ff5566);
-    transition: width 0.18s linear;
+    transition: width 0.18s linear, background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .timer-fill.penalty {
+    background: linear-gradient(90deg, #ff3355, #ff6688, #ff3355);
+    box-shadow: 0 0 10px rgba(255,60,90,0.75);
   }
 
   #combo-text {
@@ -567,6 +571,17 @@ function pickBlock(clientX, clientY){
   return null;
 }
 
+function applyMistakePenalty(){
+  riseTimer *= 0.5;
+  combo = 0;
+  clearTimeout(comboResetTimer);
+  var fill = document.getElementById('timer-fill');
+  fill.classList.add('penalty');
+  setTimeout(function(){ fill.classList.remove('penalty'); }, 350);
+  updateTimerBar();
+  if (navigator.vibrate) { try { navigator.vibrate([20, 40, 20]); } catch(e){} }
+}
+
 function onPointerDown(x, y){
   if (!gameRunning || gameOver) return;
   var block = pickBlock(x, y);
@@ -584,6 +599,7 @@ function onPointerDown(x, y){
   } else {
     block.mesh.scale.setScalar(0.82);
     playDeniedSound();
+    applyMistakePenalty();
   }
 }
 
