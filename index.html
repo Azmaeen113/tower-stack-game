@@ -103,10 +103,7 @@
     <div id="mainMenu" class="overlay">
         <h1>CYBER_STRIKE</h1>
         <p class="subtitle">DRAG TO FLY · NEON FIRE · DODGE GLOWING METEORS</p>
-        <div class="menu-btns">
-            <button class="btn" id="startInfBtn">∞ INFINITY HEALTH</button>
-            <button class="btn sec" id="startNormBtn">NORMAL · 200 SHIELD</button>
-        </div>
+        <button class="btn" id="startBtn">INITIALIZE</button>
     </div>
     <div id="gameOverMenu" class="overlay hidden">
         <h1>SYSTEM_CRASH</h1>
@@ -181,11 +178,8 @@ const MAX_METEORS = 24;
 const MAX_BULLETS = 100;
 const MAX_PARTICLES = 70;
 const NORMAL_MAX_HP = 200;
-let godMode = false;
-let lastInfinityMode = false;
 let hitAlertTimer = 0;
 let damageToastTimer = 0;
-
 const ENEMY_SHOT_DAMAGE = 25;
 const METEOR_LEAK_DAMAGE = 12;
 let bgLayer = null;
@@ -280,7 +274,6 @@ function triggerHitAlert(strong) {
 }
 
 function damagePlayer(amount, fromEnemyShot) {
-    if (godMode) return;
     player.hp = Math.max(0, player.hp - amount);
     playSound('hurt');
     if (fromEnemyShot) {
@@ -650,14 +643,12 @@ function updateStage() {
     }
 }
 
-function startGame(infinityMode) {
-    lastInfinityMode = !!infinityMode;
-    godMode = lastInfinityMode;
+function startGame() {
     score = 0; stage = 1;
     enemySpawnInterval = 1400;
     lastLaserSound = 0;
     player = new Player();
-    player.maxHp = godMode ? player.maxHp : NORMAL_MAX_HP;
+    player.maxHp = NORMAL_MAX_HP;
     player.hp = player.maxHp;
     bullets = []; meteors = []; particles = [];
     rebuildBgLayer();
@@ -670,7 +661,7 @@ function startGame(infinityMode) {
     damageToast.classList.remove('show');
     hitAlertTimer = 0;
     damageToastTimer = 0;
-    hpDisplay.textContent = godMode ? '∞' : String(player.hp);
+    hpDisplay.textContent = String(player.hp);
     lastTime = performance.now();
     requestAnimationFrame(gameLoop);
 }
@@ -782,10 +773,9 @@ function gameLoop(timestamp) {
     scoreDisplay.textContent = score;
     stageDisplay.textContent = stage;
     gunDisplay.textContent = '×' + player.gunLevel;
-    if (godMode) player.hp = player.maxHp;
-    hpDisplay.textContent = godMode ? '∞' : Math.max(0, Math.floor(player.hp));
+    hpDisplay.textContent = Math.max(0, Math.floor(player.hp));
 
-    if (!godMode && player.hp <= 0) {
+    if (player.hp <= 0) {
         spawnExplosion(player.x, player.y, ['#00ffcc', '#ff0077', '#ffffff'], ['#00ffcc', '#ff0077', '#ffffff'], 40);
         gameOver();
         return;
@@ -794,9 +784,8 @@ function gameLoop(timestamp) {
     requestAnimationFrame(gameLoop);
 }
 
-document.getElementById('startInfBtn').addEventListener('click', function(){ startGame(true); });
-document.getElementById('startNormBtn').addEventListener('click', function(){ startGame(false); });
-document.getElementById('restartBtn').addEventListener('click', function(){ startGame(lastInfinityMode); });
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
 </script>
 </body>
 </html>
