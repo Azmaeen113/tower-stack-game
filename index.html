@@ -68,45 +68,65 @@ let obstacles=[],particles=[],floats=[],bgHexes=[];
 let spawnTimer=0, spawnInterval=58, fallSpeed=4.5;
 let shakeT=0, invincible=0, dead=false;
 let bgScroll=0;
-let audioCtx=null;
-const COLORS=['#00ff88','#00cfff','#ff6eb4','#a855f7','#ffd700','#ff4500'];
+let audioCtx=null, masterGain=null, audioUnlocked=false;
 
 function ensureAudio(){
-  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(!audioCtx){
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return Promise.resolve(false);
+    audioCtx=new AC();
+    masterGain=audioCtx.createGain();
+    masterGain.gain.value=0.9;
+    masterGain.connect(audioCtx.destination);
+  }
+  if(audioCtx.state==='running'){
+    audioUnlocked=true;
+    return Promise.resolve(true);
+  }
+  return audioCtx.resume().then(function(){
+    audioUnlocked=audioCtx.state==='running';
+    return audioUnlocked;
+  }).catch(function(){ return false; });
 }
+
 function playTone(freq,dur,type,gain,glideTo){
-  if(!audioCtx) return;
+  if(!audioCtx||!masterGain||audioCtx.state!=='running') return;
+  const t=audioCtx.currentTime;
   const osc=audioCtx.createOscillator();
   const g=audioCtx.createGain();
   osc.type=type||'sine';
-  osc.frequency.value=freq;
-  if(glideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40,glideTo),audioCtx.currentTime+dur);
-  g.gain.value=gain||0.1;
-  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
-  osc.connect(g).connect(audioCtx.destination);
-  osc.start();
-  osc.stop(audioCtx.currentTime+dur);
+  osc.frequency.setValueAtTime(freq,t);
+  if(glideTo) osc.frequency.exponentialRampToValueAtTime(Math.max(40,glideTo),t+dur);
+  const peak=Math.max(0.0001,gain||0.18);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(peak,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  osc.connect(g).connect(masterGain);
+  osc.start(t);
+  osc.stop(t+dur+0.02);
 }
-function playMoveSound(){
-  playTone(420,0.06,'square',0.06,680);
-}
+
+function playMoveSound(){ playTone(520,0.07,'square',0.16,760); }
 function playScoreSound(){
-  playTone(660,0.08,'sine',0.09,880);
-  setTimeout(()=>playTone(880,0.1,'sine',0.07),50);
+  playTone(740,0.09,'sine',0.18,980);
+  setTimeout(function(){ playTone(980,0.11,'sine',0.14); },55);
 }
 function playHitSound(){
-  playTone(180,0.18,'sawtooth',0.14,70);
-  setTimeout(()=>playTone(120,0.22,'square',0.1,55),80);
+  playTone(200,0.2,'sawtooth',0.22,80);
+  setTimeout(function(){ playTone(130,0.24,'square',0.16,60); },90);
 }
 function playStartSound(){
-  [440,554,660,880].forEach((f,i)=>setTimeout(()=>playTone(f,0.12,'sine',0.08),i*70));
+  [440,554,660,880].forEach(function(f,i){
+    setTimeout(function(){ playTone(f,0.13,'sine',0.16); },i*75);
+  });
 }
 function playGameOverSound(){
-  playTone(330,0.25,'sawtooth',0.12,90);
-  setTimeout(()=>playTone(220,0.35,'sawtooth',0.1,55),160);
-  setTimeout(()=>playTone(110,0.45,'square',0.08,40),320);
+  playTone(350,0.28,'sawtooth',0.2,100);
+  setTimeout(function(){ playTone(230,0.36,'sawtooth',0.16,70); },170);
+  setTimeout(function(){ playTone(120,0.48,'square',0.14,45); },340);
 }
+
+const COLORS=['#00ff88','#00cfff','#ff6eb4','#a855f7','#ffd700','#ff4500'];
 
 function getFallSpeed(){
   return 4.5+score*0.07+Math.floor(score/40)*0.9;
@@ -181,32 +201,42 @@ class FText{
 }
 
 // ── Input ──
-function moveLeft(){ if(!dead&&state==='playing'&&playerLane>0){ playerLane--; playerTargetX=laneX(playerLane); dogeEffect(); } }
-function moveRight(){ if(!dead&&state==='playing'&&playerLane<LANE_COUNT-1){ playerLane++; playerTargetX=laneX(playerLane); dogeEffect(); } }
+function moveLeft(){ if(!dead&&state==='playing'&&playerLane>0){ playerLane--; playerTargetX=laneX(playerLane); dogeEffect(); playMoveSound(); } }
+function moveRight(){ if(!dead&&state==='playing'&&playerLane<LANE_COUNT-1){ playerLane++; playerTargetX=laneX(playerLane); dogeEffect(); playMoveSound(); } }
 function dogeEffect(){ for(let i=0;i<5;i++) particles.push(new Spark(playerX,PLAYER_Y,'#00ff88')); }
 
-canvas.addEventListener('touchstart',e=>{
+canvas.addEventListener('touchstart',function(e){
   e.preventDefault();
+  ensureAudio();
   const t=e.touches[0];
   if(t.clientX<W/2) moveLeft(); else moveRight();
 },{passive:false});
-document.addEventListener('keydown',e=>{
+document.addEventListener('keydown',function(e){
+  ensureAudio();
   if(e.key==='ArrowLeft'||e.key==='a') moveLeft();
   if(e.key==='ArrowRight'||e.key==='d') moveRight();
 });
-canvas.addEventListener('mousedown',e=>{ if(e.clientX<W/2)moveLeft();else moveRight(); });
+canvas.addEventListener('mousedown',function(e){
+  ensureAudio();
+  if(e.clientX<W/2) moveLeft(); else moveRight();
+});
 
 function startGame(){
+  ensureAudio().then(function(){
+    playStartSound();
+  });
   state='playing'; score=10; frame=0; dead=false;
   playerLane=2; playerX=laneX(2); playerTargetX=laneX(2);
   obstacles=[]; particles=[]; floats=[];
-  spawnTimer=0; spawnInterval=55; fallSpeed=5; invincible=60;
+  spawnTimer=0; invincible=60;
+  syncDifficulty();
   shakeT=0; bgScroll=0;
   document.getElementById('hSc').textContent='10';
   document.getElementById('overlay').style.display='none';
 }
 function gameOver(){
   if(dead) return; dead=true; state='over'; shakeT=20;
+  playGameOverSound();
   // Report score to parent webapp
   if(window.parent!==window){ window.parent.postMessage({type:'VVQ_GAME_SCORE',score:score},'*'); }
   const best=Math.max(score,hi());
@@ -297,10 +327,9 @@ function loop(){
     // smooth player move
     playerX=lerp(playerX,playerTargetX,0.3);
     if(invincible>0) invincible--;
-    // spawn
+    // spawn + progressive speed
     spawnTimer++;
-    spawnInterval=Math.max(30,55-score/8);
-    fallSpeed=5+score*0.04;
+    syncDifficulty();
     if(spawnTimer>=spawnInterval){ spawnTimer=0; obstacles.push(new Obstacle()); }
     // update obstacles
     obstacles.forEach(o=>o.update());
@@ -309,10 +338,12 @@ function loop(){
       obstacles.forEach(o=>{
         if(o.hits(playerLane)){
           invincible=40; shakeT=15;
+          playHitSound();
           for(let i=0;i<18;i++) particles.push(new Spark(playerX,PLAYER_Y,'#ff4500'));
           floats.push(new FText(playerX,PLAYER_Y-60,'HIT!','#ff4500',true));
           score=Math.max(0,score-5);
           document.getElementById('hSc').textContent=score;
+          syncDifficulty();
           if(score<=0) gameOver();
         }
       });
@@ -320,7 +351,13 @@ function loop(){
     // score
     obstacles=obstacles.filter(o=>{
       if(o.y>H+60){
-        if(!o.lanes.includes(playerLane)){ score++; document.getElementById('hSc').textContent=score; if(score>hi())localStorage.setItem('hd_hi',score); }
+        if(!o.lanes.includes(playerLane)){
+          score++;
+          playScoreSound();
+          document.getElementById('hSc').textContent=score;
+          if(score>hi()) localStorage.setItem('hd_hi',score);
+          syncDifficulty();
+        }
         return false;
       }
       return true;
