@@ -66,7 +66,7 @@ const HEX_R=LANE_W*0.38;
 const PLAYER_Y=H*0.8;
 
 // ── State ──
-let state='menu',score=0,frame=0;
+let state='menu',score=0,frame=0,lives=3;
 let playerLane=2, playerX=laneX(2), playerTargetX=laneX(2);
 let obstacles=[],particles=[],floats=[],bgHexes=[];
 let spawnTimer=0, spawnInterval=58, fallSpeed=4.5;
@@ -225,38 +225,71 @@ canvas.addEventListener('mousedown',function(e){
   if(e.clientX<W/2) moveLeft(); else moveRight();
 });
 
+function updateLivesUI(){
+  const symbols=['\u9632\u9632\u9632','\u9632\u9632\u9633','\u9632\u9633\u9633','\u9633\u9633\u9633'];
+  document.getElementById('hLv').textContent=symbols[3-Math.max(0,lives)]||symbols[3];
+}
+
 function startGame(){
   ensureAudio().then(function(){
     playStartSound();
   });
-  state='playing'; score=10; frame=0; dead=false;
+  state='playing'; score=0; frame=0; dead=false; lives=3;
   playerLane=2; playerX=laneX(2); playerTargetX=laneX(2);
   obstacles=[]; particles=[]; floats=[];
   spawnTimer=0; invincible=60;
   syncDifficulty();
   shakeT=0; bgScroll=0;
-  document.getElementById('hSc').textContent='10';
+  document.getElementById('hSc').textContent='0';
+  updateLivesUI();
   document.getElementById('overlay').style.display='none';
 }
+
+function continueWithJam(){
+  lives=2;
+  dead=false;
+  state='playing';
+  invincible=90;
+  obstacles=obstacles.filter(function(o){ return o.y<PLAYER_Y-HEX_R*2; });
+  updateLivesUI();
+  document.getElementById('overlay').style.display='none';
+  ensureAudio().then(function(){ playStartSound(); });
+}
+
+function requestContinue(){
+  if(window.parent!==window){
+    window.parent.postMessage({type:'VVQ_USE_JAM',game:'hex-dodge',score:score,lives:2},'*');
+  }else{
+    continueWithJam();
+  }
+}
+
+window.addEventListener('message',function(e){
+  if(!e.data) return;
+  if(e.data.type==='VVQ_CONTINUE_OK'||e.data.type==='VVQ_JAM_APPROVED'){
+    continueWithJam();
+  }
+});
+
 function gameOver(){
   if(dead) return; dead=true; state='over'; shakeT=20;
   playGameOverSound();
-  // Report score to parent webapp
   if(window.parent!==window){ window.parent.postMessage({type:'VVQ_GAME_SCORE',score:score},'*'); }
   const best=Math.max(score,hi());
   if(score>hi()) localStorage.setItem('hd_hi',score);
   document.getElementById('hBs').textContent=best;
-  setTimeout(()=>{
+  setTimeout(function(){
     const ov=document.getElementById('overlay');
-    ov.innerHTML=`
-      <div class="ot" style="font-size:36px">GAME<br>OVER</div>
-      <div class="os">HEXED</div>
-      <div style="color:#fff;font-size:60px;font-weight:900;text-shadow:0 0 20px #00ff8877;margin:8px 0">${score}</div>
-      ${score>=best&&score>0?'<div style="color:#ffd700;font-size:11px;letter-spacing:4px;margin-bottom:26px">NEW BEST!</div>':'<div style="color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:3px;margin-bottom:26px">BEST: '+best+'</div>'}
-      <button class="ob" id="ovBtn">RETRY</button>
-    `;
+    ov.innerHTML=
+      '<div class="ot" style="font-size:36px">GAME<br>OVER</div>'+
+      '<div class="os">HEXED</div>'+
+      '<div style="color:#fff;font-size:60px;font-weight:900;text-shadow:0 0 20px #00ff8877;margin:8px 0">'+score+'</div>'+
+      (score>=best&&score>0?'<div style="color:#ffd700;font-size:11px;letter-spacing:4px;margin-bottom:26px">NEW BEST!</div>':'<div style="color:rgba(255,255,255,0.3);font-size:11px;letter-spacing:3px;margin-bottom:26px">BEST: '+best+'</div>')+
+      '<button class="ob sec" id="contBtn">CONTINUE · 2 LIVES</button>'+
+      '<button class="ob" id="ovBtn">RETRY</button>';
     ov.style.display='flex';
     document.getElementById('ovBtn').addEventListener('click',startGame);
+    document.getElementById('contBtn').addEventListener('click',requestContinue);
   },550);
 }
 document.getElementById('ovBtn').addEventListener('click',startGame);
@@ -340,20 +373,22 @@ function loop(){
     // collision
     if(invincible===0){
       obstacles.forEach(o=>{
-        if(o.hits(playerLane)){
+        if(o.hits(playerLane)&&o.alive){
+          o.alive=false;
           invincible=40; shakeT=15;
           playHitSound();
           for(let i=0;i<18;i++) particles.push(new Spark(playerX,PLAYER_Y,'#ff4500'));
-          floats.push(new FText(playerX,PLAYER_Y-60,'HIT!','#ff4500',true));
-          score=Math.max(0,score-5);
-          document.getElementById('hSc').textContent=score;
+          floats.push(new FText(playerX,PLAYER_Y-60,'-1 LIFE','#ff4500',true));
+          lives=Math.max(0,lives-1);
+          updateLivesUI();
           syncDifficulty();
-          if(score<=0) gameOver();
+          if(lives<=0) gameOver();
         }
       });
     }
     // score
     obstacles=obstacles.filter(o=>{
+      if(!o.alive) return false;
       if(o.y>H+60){
         if(!o.lanes.includes(playerLane)){
           score++;
@@ -372,7 +407,7 @@ function loop(){
     document.getElementById('hSc').textContent=score;
   }
 
-  obstacles.forEach(o=>o.draw());
+  obstacles.filter(o=>o.alive).forEach(o=>o.draw());
   particles.forEach(p=>p.draw());
   drawPlayer();
   floats.forEach(f=>f.draw());
