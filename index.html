@@ -8,8 +8,10 @@
 * { margin:0;padding:0;box-sizing:border-box;touch-action:none;-webkit-tap-highlight-color:transparent; }
 body { background:#000; overflow:hidden; width:100vw; height:100vh; font-family:'Courier New',monospace; user-select:none; }
 canvas { display:block; position:absolute; top:0; left:0; }
-#hud { position:absolute; top:0; left:0; right:0; padding:18px; display:flex; justify-content:space-between; pointer-events:none; z-index:10; }
-.hc { background:rgba(0,255,136,0.07); border:1px solid rgba(0,255,136,0.2); border-radius:14px; padding:9px 16px; backdrop-filter:blur(8px); }
+#hud { position:absolute; top:0; left:0; right:0; padding:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px; pointer-events:none; z-index:10; }
+.hc { background:rgba(0,255,136,0.07); border:1px solid rgba(0,255,136,0.2); border-radius:14px; padding:9px 16px; backdrop-filter:blur(8px); flex:1; max-width:120px; }
+.hc.lives { border-color:rgba(255,110,180,0.35); }
+.hc.lives .hv { color:#ff6eb4; letter-spacing:2px; font-size:20px; }
 .hl { font-size:9px; letter-spacing:3px; color:rgba(0,255,136,0.55); display:block; margin-bottom:2px; }
 .hv { font-size:24px; font-weight:900; color:#00ff88; display:block; }
 #tap-hint { position:absolute; bottom:25px; left:0; right:0; display:flex; justify-content:space-between; padding:0 30px; pointer-events:none; z-index:10; }
@@ -19,6 +21,7 @@ canvas { display:block; position:absolute; top:0; left:0; }
 .os { font-size:10px; letter-spacing:5px; color:rgba(255,255,255,0.25); margin:8px 0 44px; }
 .ob { padding:17px 56px; border-radius:10px; background:linear-gradient(135deg,#00ff88,#00cfff); border:none; font-size:17px; font-weight:900; color:#000; letter-spacing:3px; cursor:pointer; box-shadow:0 0 40px #00ff8844; font-family:'Courier New',monospace; }
 .ob:active{transform:scale(0.94);}
+.ob.sec { background:linear-gradient(135deg,#ffd700,#ff8800); box-shadow:0 0 40px #ffd70044; margin-top:10px; }
 .obest { color:rgba(0,255,136,0.45); font-size:12px; margin-top:20px; letter-spacing:2px; }
 .obest span{color:#00ff88;font-weight:bold;}
 </style>
@@ -27,6 +30,7 @@ canvas { display:block; position:absolute; top:0; left:0; }
 <canvas id="c"></canvas>
 <div id="hud">
   <div class="hc"><span class="hl">SCORE</span><span class="hv" id="hSc">0</span></div>
+  <div class="hc lives"><span class="hl">LIVES</span><span class="hv" id="hLv">■■■</span></div>
   <div class="hc"><span class="hl">BEST</span><span class="hv" id="hBs">0</span></div>
 </div>
 <div id="tap-hint">
