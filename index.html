@@ -41,8 +41,12 @@
     font-weight: 900; 
     color: #fff;
     text-shadow: 0 4px 16px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.8); 
-    transition: color 0.15s ease-in-out;
+    transition: color 0.15s ease-in-out, text-shadow 0.2s ease;
     line-height: 1;
+  }
+  .score-value.penalty {
+    color: #ff5566 !important;
+    text-shadow: 0 0 18px rgba(255,80,100,0.9), 0 4px 16px rgba(0,0,0,0.9);
   }
   .best-row { 
     font-size: 13px; 
@@ -573,11 +577,20 @@ function pickBlock(clientX, clientY){
 
 function applyMistakePenalty(){
   riseTimer *= 0.5;
+  score = Math.floor(score * 0.5);
+  document.getElementById('score-value').textContent = score;
+  syncRiseDifficulty();
+  riseTimer = Math.min(riseTimer, riseTimerMax);
   combo = 0;
   clearTimeout(comboResetTimer);
   var fill = document.getElementById('timer-fill');
+  var scoreEl = document.getElementById('score-value');
   fill.classList.add('penalty');
-  setTimeout(function(){ fill.classList.remove('penalty'); }, 350);
+  scoreEl.classList.add('penalty');
+  setTimeout(function(){
+    fill.classList.remove('penalty');
+    scoreEl.classList.remove('penalty');
+  }, 350);
   updateTimerBar();
   if (navigator.vibrate) { try { navigator.vibrate([20, 40, 20]); } catch(e){} }
 }
