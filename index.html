@@ -9,8 +9,8 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;overflow:hidden;background:#0B3954;touch-action:none;-webkit-tap-highlight-color:transparent;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-#wrap{position:fixed;inset:0;display:flex;flex-direction:column}
-canvas{display:block;flex:1;width:100%;touch-action:none;cursor:crosshair}
+#wrap{position:fixed;inset:0}
+canvas{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 .btn{min-width:44px;min-height:44px;border:none;border-radius:12px;background:rgba(46,196,182,.88);color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-weight:600;transition:transform .12s,background .12s;border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(6px);text-decoration:none;flex-shrink:0}
 .btn:active{transform:scale(.93)}
 .btn svg{width:22px;height:22px}
@@ -435,18 +435,19 @@ function resize(){
 }
 
 function computeLayout(){
-  const margin=16;
-  playLeft=margin+28;playRight=W-margin-28;
+  const sidePad=4;
+  playLeft=sidePad;
+  playRight=W-sidePad;
   const availW=playRight-playLeft;
   cols=levelCfg?levelCfg.cols:11;
   if(cols%2===0)cols--;
-  br=Math.min(24,Math.floor(availW/(cols*2+1)));
-  if(br<14)br=14;
-  gridTop=Math.max(100,H*0.12);
+  br=Math.min(30,Math.floor(availW/(cols*2+1)));
+  if(br<12)br=12;
+  gridTop=Math.max(68,H*0.06);
   shooterX=(playLeft+playRight)/2;
-  shooterY=H-Math.max(70,H*0.1);
+  shooterY=H-Math.max(52,H*0.07);
   dangerY=shooterY-br*4;
-  clusterBounds={left:playLeft,right:playRight,top:gridTop-20,bottom:shooterY-50};
+  clusterBounds={left:0,right:W,top:gridTop-br*0.25,bottom:H};
 }
 
 function hexPos(r,c){
@@ -834,51 +835,24 @@ function drawShooter(){
   drawBubble(previewX,previewY+br*0.15,nextColor,0.72,0.95);
 }
 
-/* drawCluster - kelp frame and play area enclosure */
+/* drawCluster - danger line and edge kelp only (full-screen play area) */
 function drawCluster(){
-  const cl=clusterBounds.left,cr=clusterBounds.right;
-  const ct=clusterBounds.top,cb=clusterBounds.bottom;
-  const cw=cr-cl,ch=cb-ct;
   ctx.save();
-  const innerGlow=ctx.createLinearGradient(cl,ct,cl,cb);
-  innerGlow.addColorStop(0,'rgba(46,196,182,0.08)');
-  innerGlow.addColorStop(0.5,'rgba(11,57,84,0.28)');
-  innerGlow.addColorStop(1,'rgba(27,73,101,0.42)');
-  ctx.fillStyle=innerGlow;
-  ctx.fillRect(cl,ct,cw,ch);
-  ctx.strokeStyle='rgba(46,196,182,0.25)';
-  ctx.lineWidth=1;
-  ctx.setLineDash([6,8]);
-  ctx.strokeRect(cl+2,ct+2,cw-4,ch-4);
-  ctx.setLineDash([]);
-  ctx.strokeStyle='rgba(46,196,182,0.15)';
-  ctx.lineWidth=3;
-  ctx.strokeRect(cl-1,ct-1,cw+2,ch+2);
-  const cornerR=14;
-  [[cl,ct],[cr,ct],[cl,cb],[cr,cb]].forEach(function(pt,i){
-    ctx.fillStyle='rgba(26,107,74,0.45)';
-    ctx.beginPath();
-    ctx.arc(pt[0],pt[1],cornerR,0,Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle='rgba(46,196,182,0.35)';
-    ctx.lineWidth=1.5;
-    ctx.stroke();
-  });
   if(levelCfg&&levelCfg.danger){
     ctx.strokeStyle='rgba(255,107,107,0.55)';
     ctx.lineWidth=2;
     ctx.setLineDash([10,8]);
     ctx.beginPath();
-    ctx.moveTo(cl,dangerY);
-    ctx.lineTo(cr,dangerY);
+    ctx.moveTo(0,dangerY);
+    ctx.lineTo(W,dangerY);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle='rgba(255,107,107,0.12)';
-    ctx.fillRect(cl,dangerY,cw,cb-dangerY);
+    ctx.fillRect(0,dangerY,W,H-dangerY);
     ctx.fillStyle='rgba(255,107,107,0.7)';
     ctx.font='600 11px system-ui';
     ctx.textAlign='left';
-    ctx.fillText('DANGER',cl+8,dangerY-6);
+    ctx.fillText('DANGER',8,dangerY-6);
   }
   kelpStrands.forEach(function(k){
     drawKelpStrand(k);
