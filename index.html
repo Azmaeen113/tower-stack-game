@@ -74,9 +74,9 @@
         }
         #damageToast {
             position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 1.3rem; font-weight: 900; color: #ff2244; letter-spacing: 4px;
-            text-shadow: 0 0 16px #ff0044, 0 0 30px #ff0077; pointer-events: none; z-index: 9;
-            opacity: 0; transition: opacity 0.15s;
+            font-size: 1.6rem; font-weight: 900; color: #ff1133; letter-spacing: 4px;
+            text-shadow: 0 0 18px #ff1133, 0 0 36px #ff0044; pointer-events: none; z-index: 9;
+            opacity: 0; transition: opacity 0.08s;
         }
         #damageToast.show { opacity: 1; }
         @keyframes glitch {
@@ -186,7 +186,7 @@ let lastInfinityMode = false;
 let hitAlertTimer = 0;
 let damageToastTimer = 0;
 
-const ENEMY_SHOT_DAMAGE = 18;
+const ENEMY_SHOT_DAMAGE = 25;
 const METEOR_LEAK_DAMAGE = 12;
 let bgLayer = null;
 let lastLaserSound = 0;
@@ -263,13 +263,18 @@ function showToast(msg) {
 }
 
 function showDamageToast(msg) {
+    damageToast.classList.remove('show');
+    void damageToast.offsetWidth;
     damageToast.textContent = msg;
     damageToast.classList.add('show');
-    damageToastTimer = 50;
+    damageToastTimer = 60;
 }
 
 function triggerHitAlert(strong) {
-    hitAlertTimer = strong ? 50 : 35;
+    hitAlertTimer = strong ? 55 : 35;
+    hitAlert.classList.remove('on');
+    gameContainer.classList.remove('hit');
+    void hitAlert.offsetWidth;
     hitAlert.classList.add('on');
     gameContainer.classList.add('hit');
 }
@@ -278,8 +283,12 @@ function damagePlayer(amount, fromEnemyShot) {
     if (godMode) return;
     player.hp = Math.max(0, player.hp - amount);
     playSound('hurt');
-    triggerHitAlert(fromEnemyShot);
-    if (fromEnemyShot) showDamageToast('-' + amount + ' SHIELD');
+    if (fromEnemyShot) {
+        triggerHitAlert(true);
+        showDamageToast('-25 HEALTH');
+    } else {
+        triggerHitAlert(false);
+    }
 }
 
 // Glowing meteor types — dark rocky core + neon aura
@@ -711,6 +720,16 @@ function gameLoop(timestamp) {
         if (bullets[i].y < -20 || bullets[i].y > canvas.height + 20) bullets.splice(i, 1);
     }
 
+    // Enemy shots vs player — always checked (not tied to meteor proximity)
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        if (b.isPlayer) continue;
+        if (checkCollision(player, b, 'rect-circle')) {
+            damagePlayer(ENEMY_SHOT_DAMAGE, true);
+            bullets.splice(i, 1);
+        }
+    }
+
     for (let i = meteors.length - 1; i >= 0; i--) {
         const m = meteors[i];
         m.update(deltaTime);
@@ -731,8 +750,9 @@ function gameLoop(timestamp) {
 
         for (let j = bullets.length - 1; j >= 0; j--) {
             const b = bullets[j];
+            if (!b.isPlayer) continue;
             if (Math.abs(b.y - m.y) > m.radius + 24) continue;
-            if (b.isPlayer && checkCollision(b, m, 'circle-circle')) {
+            if (checkCollision(b, m, 'circle-circle')) {
                 m.hp--;
                 bullets.splice(j, 1);
                 particles.push(new Particle(b.x, b.y, '#ff0077', 3, '#ff0077'));
@@ -744,10 +764,6 @@ function gameLoop(timestamp) {
                     meteors.splice(i, 1);
                 }
                 break;
-            } else if (!b.isPlayer && checkCollision(b, player, 'circle-circle')) {
-                const shotDmg = ENEMY_SHOT_DAMAGE + Math.min(8, Math.floor(stage * 0.4));
-                damagePlayer(shotDmg, true);
-                bullets.splice(j, 1);
             }
         }
     }
