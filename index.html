@@ -179,8 +179,9 @@ var COLORS = [
 ];
 var INITIAL_FILLED_ROWS = 6; 
 var RISE_INTERVAL_START = 8000;
-var RISE_INTERVAL_MIN = 3200;
-var RISE_DECREMENT = 350;
+var RISE_INTERVAL_MIN = 2800;
+var RISE_DECREMENT = 280;
+var SCORE_RISE_STEP = 28;
 var POP_ANIM_MS = 280;
 var HIGHLIGHT_DELAY_MS = 120;
 
@@ -346,6 +347,15 @@ function floodFill(row, col){
   return result;
 }
 
+function getRiseIntervalForScore(s){
+  return Math.max(RISE_INTERVAL_MIN, RISE_INTERVAL_START - s * SCORE_RISE_STEP);
+}
+
+function syncRiseDifficulty(){
+  riseTimerMax = getRiseIntervalForScore(score);
+  if (riseTimer > riseTimerMax) riseTimer = riseTimerMax;
+}
+
 function applyGravityColumn(col){
   var remaining = [];
   for (var r=0;r<ROWS;r++){
@@ -417,7 +427,7 @@ function insertNewRow(){
     grid[ROWS-1][cc] = nb;
   }
   
-  riseTimerMax = Math.max(RISE_INTERVAL_MIN, riseTimerMax - RISE_DECREMENT);
+  riseTimerMax = Math.max(RISE_INTERVAL_MIN, getRiseIntervalForScore(score) - RISE_DECREMENT);
   riseTimer = riseTimerMax;
   if (overflowed) triggerGameOver();
   return overflowed;
@@ -427,8 +437,8 @@ function insertNewRow(){
 function popGroup(group){
   if (group.length < 2) return;
   var now = performance.now();
-  var multiplier = 1 + combo*0.12;
-  var gained = Math.round(group.length*group.length*4*multiplier);
+  var tileCount = group.length;
+  var gained = combo >= 1 ? tileCount * 2 : tileCount;
   
   var groupColorHex = COLORS[group[0].colorIndex].hex;
   
@@ -608,6 +618,8 @@ function playGameOverSound(){ playTone(300, 0.6, 'sawtooth', 0.15, 40); }
 function addScore(n){
   score += n;
   document.getElementById('score-value').textContent = score;
+  syncRiseDifficulty();
+  riseTimer = Math.min(riseTimer, riseTimerMax);
 }
 function updateScoreColor(hexNum){
   var colorString = '#' + hexNum.toString(16).padStart(6, '0');
@@ -616,7 +628,7 @@ function updateScoreColor(hexNum){
 function updateComboUI(){
   if (combo >= 2){
     var el = document.getElementById('combo-text');
-    el.textContent = 'COMBO x' + combo;
+    el.textContent = 'COMBO x' + combo + ' · 2x TILES';
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
