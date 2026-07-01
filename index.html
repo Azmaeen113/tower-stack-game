@@ -847,8 +847,12 @@ let lives = MAX_LIVES;
 let invulnTime = 0;
 
 const GRAVITY = -11.5;
-// Bounce peak ≤ one stack gap: h = v²/(2g)
-const BOUNCE_HEIGHT = LAYER_GAP * 0.66;
+// Bounce peak must fit in the air gap between slabs (not through the layer above)
+const SLAB_AIR_GAP = LAYER_GAP - LAYER_HEIGHT;
+const BOUNCE_HEIGHT = Math.min(
+  LAYER_GAP * 0.66,
+  SLAB_AIR_GAP - BALL_RADIUS * 2 - 0.05
+);
 const BOUNCE_VEL = Math.sqrt(2 * Math.abs(GRAVITY) * BOUNCE_HEIGHT);
 const MAX_UPWARD_VEL = BOUNCE_VEL;
 
@@ -934,6 +938,7 @@ function crossedPlaneUp(prevY, currY, planeY){
 
 function resolveCollisions(prevY){
   const topHit = (l) => layerTopY(l) + BALL_RADIUS;
+  const botHit = (l) => layerBottomY(l) - BALL_RADIUS;
 
   if(ballVelY < 0){
     const sorted = [...layers].sort((a, b) => b.y - a.y);
@@ -969,18 +974,38 @@ function resolveCollisions(prevY){
       return;
     }
   } else if(ballVelY > 0){
-    const botHit = (l) => layerBottomY(l) - BALL_RADIUS;
     const sorted = [...layers].sort((a, b) => a.y - b.y);
     for(const l of sorted){
       if(layerIsGapAtBall(l)) continue;
       const underside = botHit(l);
-      if(!crossedPlaneUp(prevY, ballY, underside)) continue;
+      const slabTop = layerTopY(l);
+      const risingIntoSlab = ballY + BALL_RADIUS > layerBottomY(l) + 0.004 && ballY < slabTop;
+      const hitUnderside = crossedPlaneUp(prevY, ballY, underside) || risingIntoSlab;
+      if(!hitUnderside) continue;
       ballY = underside - 0.01;
-      ballVelY = -ballVelY * 0.3;
+      ballVelY = -Math.abs(ballVelY) * 0.18;
       updateBallWorldPos();
       recycleLayers();
       return;
     }
+  }
+
+  // Safety: never leave ball centre inside a solid slab
+  for(const l of layers){
+    if(layerIsGapAtBall(l)) continue;
+    const bot = botHit(l);
+    const top = topHit(l);
+    if(ballY <= bot || ballY >= top) continue;
+    if(ballVelY > 0){
+      ballY = bot - 0.01;
+      ballVelY = -Math.abs(ballVelY) * 0.18;
+    } else {
+      ballY = top + 0.01;
+      ballVelY = BOUNCE_VEL;
+    }
+    updateBallWorldPos();
+    recycleLayers();
+    return;
   }
 
   recycleLayers();
