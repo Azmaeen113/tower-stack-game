@@ -39,7 +39,7 @@
         }
 
         #fxCanvas {
-            position: fixed; inset: 0; pointer-events: none; z-index: 20;
+            position: fixed; inset: 0; pointer-events: none; z-index: 8;
         }
 
         #game-container {
@@ -100,7 +100,18 @@
                         0 0 40px rgba(255,71,87,0.08);
             border: 1px solid rgba(255,255,255,0.1);
             touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
+
+        #swipe-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 15;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+            cursor: grab;
+        }
+        #swipe-layer:active { cursor: grabbing; }
 
         #grid-bg {
             display: grid;
@@ -239,6 +250,7 @@
             <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
         </div>
         <div id="tile-layer"></div>
+        <div id="swipe-layer" aria-hidden="true"></div>
     </div>
 
     <footer>
@@ -278,9 +290,11 @@ let nextTileId = 1;
 let animating = false;
 let timerInterval = null;
 let pointerActive = false, pointerStartX = 0, pointerStartY = 0;
-const SWIPE_THRESHOLD = 36;
+let inputLockUntil = 0;
+const SWIPE_THRESHOLD = 28;
 
 const gridContainer = document.getElementById('grid-container');
+const swipeLayer = document.getElementById('swipe-layer');
 const tileLayer = document.getElementById('tile-layer');
 const scoreVal = document.getElementById('score-val');
 const levelVal = document.getElementById('level-val');
@@ -624,27 +638,75 @@ function canSwipe() {
     return !gameState.isGameOver && !animating && !menuOverlay.classList.contains('active') && !gameoverOverlay.classList.contains('active');
 }
 
-gridContainer.addEventListener('pointerdown', e => {
+function onSwipeStart(x, y) {
     if (!canSwipe()) return;
-    e.preventDefault();
     pointerActive = true;
-    pointerStartX = e.clientX;
-    pointerStartY = e.clientY;
+    pointerStartX = x;
+    pointerStartY = y;
     AudioEngine.init();
-    try { gridContainer.setPointerCapture(e.pointerId); } catch (_) {}
-});
+}
 
-gridContainer.addEventListener('pointerup', e => {
+function onSwipeEnd(x, y) {
     if (!pointerActive) return;
     pointerActive = false;
-    const dx = e.clientX - pointerStartX;
-    const dy = e.clientY - pointerStartY;
+
+    const now = Date.now();
+    if (now < inputLockUntil) return;
+
+    const dx = x - pointerStartX;
+    const dy = y - pointerStartY;
+
     if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_THRESHOLD) return;
+
+    inputLockUntil = now + CONFIG.animMs + 40;
+
     if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : 3);
     else move(dy > 0 ? 2 : 0);
-});
+}
 
-gridContainer.addEventListener('pointercancel', () => { pointerActive = false; });
+function bindSwipeInput(el) {
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    if (isTouchDevice) {
+        el.addEventListener('touchstart', e => {
+            if (!canSwipe()) return;
+            e.preventDefault();
+            const t = e.touches[0];
+            if (t) onSwipeStart(t.clientX, t.clientY);
+        }, { passive: false });
+
+        el.addEventListener('touchend', e => {
+            e.preventDefault();
+            const t = e.changedTouches[0];
+            if (t) onSwipeEnd(t.clientX, t.clientY);
+        }, { passive: false });
+
+        el.addEventListener('touchcancel', () => { pointerActive = false; });
+
+        el.addEventListener('touchmove', e => { e.preventDefault(); }, { passive: false });
+    } else {
+        el.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            onSwipeStart(e.clientX, e.clientY);
+            try { el.setPointerCapture(e.pointerId); } catch (_) {}
+        }, { passive: false });
+
+        el.addEventListener('pointerup', e => {
+            e.preventDefault();
+            onSwipeEnd(e.clientX, e.clientY);
+        }, { passive: false });
+
+        el.addEventListener('pointercancel', () => { pointerActive = false; });
+    }
+}
+
+bindSwipeInput(swipeLayer);
+
+window.addEventListener('touchend', e => {
+    if (!pointerActive) return;
+    const t = e.changedTouches[0];
+    if (t) onSwipeEnd(t.clientX, t.clientY);
+}, { passive: false });
 
 window.addEventListener('keydown', e => {
     if (!canSwipe()) return;
