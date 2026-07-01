@@ -3,1022 +3,811 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Apex Archer</title>
-    <!-- Keep apexshooterbackground.webp in the same folder as this HTML when copying to your webapp -->
-    <link rel="preload" as="image" href="apexshooterbackground.webp">
+    <title>ChromaShift: Dust Settle</title>
+    <!-- Optional: place colourpickerbackground.webp in the same folder for a custom animated backdrop -->
+    <link rel="preload" as="image" href="colourpickerbackground.webp">
     <style>
-        :root { --primary: #c0392b; --gold: #f1c40f; --dark: #1a1208; }
-        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #2d4a28; font-family: 'Segoe UI', system-ui, sans-serif; }
+        :root {
+            --bg-color: #07080f;
+            --panel-bg: rgba(18, 20, 36, 0.82);
+            --panel-border: rgba(255, 255, 255, 0.12);
+            --text-color: #f0f3f8;
+            --accent-pink: #ff0055;
+            --accent-cyan: #00ffcc;
+            --accent-gold: #ffd700;
+            --glow-pink: rgba(255, 0, 85, 0.45);
+            --glow-cyan: rgba(0, 255, 204, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text-color);
+        }
+
         #game-container {
-            position: relative; width: 100%; height: 100%;
-            display: flex; justify-content: center; align-items: center;
-            background-color: #3d6b3a;
-            background-image: url('apexshooterbackground.webp');
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
+            background-color: #07080f;
+            background-image: url('colourpickerbackground.webp');
             background-size: cover;
             background-position: center center;
             background-repeat: no-repeat;
         }
-        canvas { display: block; width: 100%; height: 100%; background: transparent; }
-        .top-hud {
-            position: absolute; top: 0; left: 0; right: 0; z-index: 8;
-            padding: 10px 12px 12px;
-            background: linear-gradient(180deg, rgba(20,12,6,0.92) 0%, rgba(20,12,6,0.55) 80%, transparent 100%);
+
+        #game-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg,
+                rgba(7, 8, 15, 0.55) 0%,
+                rgba(7, 8, 15, 0.25) 35%,
+                rgba(7, 8, 15, 0.65) 70%,
+                rgba(7, 8, 15, 0.92) 100%);
+            z-index: 2;
             pointer-events: none;
         }
-        .hud-title {
-            text-align: center; font-size: 0.65rem; letter-spacing: 4px;
-            color: rgba(241,196,15,0.75); font-weight: 800; margin-bottom: 8px;
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.65;
+        }
+
+        .ui-layer {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            pointer-events: none;
+        }
+
+        /* ── Top HUD ── */
+        header {
+            padding: 14px 16px;
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .hud-brand {
+            text-align: center;
+            margin-bottom: 2px;
+            font-size: 0.62rem;
+            letter-spacing: 5px;
+            font-weight: 800;
+            color: rgba(0, 255, 204, 0.7);
             text-transform: uppercase;
         }
-        .hud-row {
-            display: flex; align-items: stretch; gap: 8px; justify-content: center;
+
+        .stat-box {
+            flex: 1;
+            max-width: 160px;
+            background: var(--panel-bg);
+            padding: 10px 14px;
+            border-radius: 14px;
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            text-align: center;
         }
-        .stat-pill {
-            background: linear-gradient(145deg, rgba(60,40,20,0.9), rgba(30,20,10,0.95));
-            border: 1.5px solid rgba(241,196,15,0.45);
-            border-radius: 12px; padding: 8px 14px; min-width: 72px;
-            text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
-        }
-        .stat-pill.arrows { border-color: rgba(192,57,43,0.55); }
+
         .stat-label {
-            display: block; font-size: 0.6rem; letter-spacing: 2px;
-            color: rgba(255,255,255,0.45); font-weight: 700; margin-bottom: 2px;
+            display: block;
+            font-size: 0.58rem;
+            letter-spacing: 2.5px;
+            color: rgba(255, 255, 255, 0.45);
+            font-weight: 700;
+            margin-bottom: 2px;
         }
+
         .stat-value {
-            display: block; font-size: 1.35rem; font-weight: 900;
-            color: #f1c40f; text-shadow: 0 0 12px rgba(241,196,15,0.35);
+            display: block;
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: 1px;
         }
-        .stat-pill.arrows .stat-value { color: #e74c3c; text-shadow: 0 0 10px rgba(231,76,60,0.35); }
-        .stat-progress {
-            flex: 1; max-width: 200px;
-            background: linear-gradient(145deg, rgba(60,40,20,0.9), rgba(30,20,10,0.95));
-            border: 1.5px solid rgba(241,196,15,0.35);
-            border-radius: 12px; padding: 8px 12px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+
+        #score-display .stat-value { color: var(--accent-cyan); text-shadow: 0 0 14px var(--glow-cyan); }
+        #level-display .stat-value { color: var(--accent-gold); text-shadow: 0 0 12px rgba(255, 215, 0, 0.35); }
+
+        /* ── Central target zone ── */
+        #target-container {
+            position: absolute;
+            top: 28%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            text-align: center;
+            pointer-events: none;
+            width: min(92%, 520px);
         }
-        .progress-head {
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.6rem; letter-spacing: 1.5px; color: rgba(255,255,255,0.5);
-            font-weight: 700; margin-bottom: 6px;
+
+        .target-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            padding: 28px 24px 22px;
+            backdrop-filter: blur(16px);
+            box-shadow:
+                0 20px 50px rgba(0, 0, 0, 0.45),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08),
+                0 0 40px rgba(255, 0, 85, 0.08);
         }
-        .progress-head .nums { color: #f1c40f; font-size: 0.85rem; font-weight: 900; }
-        .progress-track {
-            height: 8px; border-radius: 6px;
-            background: rgba(0,0,0,0.45); overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.08);
+
+        .target-hint {
+            font-size: 0.72rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 700;
+            margin-bottom: 14px;
         }
-        .progress-fill {
-            height: 100%; width: 0%; border-radius: 6px;
-            background: linear-gradient(90deg, #c0392b, #f1c40f);
-            box-shadow: 0 0 10px rgba(241,196,15,0.5);
-            transition: width 0.35s ease;
+
+        .target-hint b {
+            color: var(--accent-cyan);
+            font-weight: 900;
         }
+
+        /* Question color block — the visual puzzle */
+        .question-block-wrap {
+            margin: 0 auto;
+            max-width: 280px;
+        }
+
+        .question-color-block {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1.35;
+            border-radius: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            box-shadow:
+                0 16px 40px rgba(0, 0, 0, 0.5),
+                inset 0 4px 16px rgba(255, 255, 255, 0.2),
+                inset 0 -6px 20px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.12s ease, box-shadow 0.2s ease;
+        }
+
+        .question-color-block::before {
+            content: '';
+            position: absolute;
+            top: 6%;
+            left: 8%;
+            width: 40%;
+            height: 18%;
+            background: rgba(255, 255, 255, 0.28);
+            border-radius: 50%;
+            filter: blur(4px);
+            pointer-events: none;
+        }
+
+        .question-color-block::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 45%, rgba(0,0,0,0.15) 100%);
+            pointer-events: none;
+        }
+
+        #illusion-word {
+            position: relative;
+            z-index: 2;
+            font-size: clamp(2rem, 9vw, 3.4rem);
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow:
+                0 3px 0 rgba(0, 0, 0, 0.55),
+                0 6px 20px rgba(0, 0, 0, 0.7),
+                0 0 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.12s ease;
+            display: inline-block;
+            line-height: 1.1;
+            padding: 0 8px;
+        }
+
+        #timer-container {
+            width: 100%;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.45);
+            border-radius: 8px;
+            margin-top: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        #timer-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-pink), var(--accent-gold), var(--accent-cyan));
+            box-shadow: 0 0 12px var(--glow-pink);
+            transition: width 0.05s linear;
+        }
+
+        /* ── Text-only answer panel ── */
+        #choice-panel {
+            width: 100%;
+            padding: 16px 16px 22px;
+            background: linear-gradient(to top, rgba(7, 8, 15, 0.97), rgba(7, 8, 15, 0.55));
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+            max-height: 48%;
+            overflow-y: auto;
+            z-index: 10;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .panel-label {
+            text-align: center;
+            font-size: 0.65rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.4);
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        #options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .name-btn {
+            background: linear-gradient(145deg, rgba(40, 42, 62, 0.95), rgba(22, 24, 38, 0.98));
+            border: 2px solid rgba(255, 255, 255, 0.14);
+            border-radius: 14px;
+            padding: 16px 10px;
+            cursor: pointer;
+            transition: transform 0.12s ease, border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            font-size: 0.92rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.92);
+            text-align: center;
+        }
+
+        .name-btn:active {
+            transform: scale(0.94);
+        }
+
+        .name-btn:hover {
+            border-color: rgba(0, 255, 204, 0.35);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 14px rgba(0, 255, 204, 0.12);
+        }
+
+        /* ── Screens ── */
         .screen {
-            position: absolute; inset: 0; background: rgba(10,8,5,0.92);
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            z-index: 20; opacity: 0; pointer-events: none; transition: opacity 0.35s;
-            backdrop-filter: blur(10px); color: #fff; text-align: center; padding: 24px;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(7, 8, 15, 0.92);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            text-align: center;
+            backdrop-filter: blur(18px);
         }
-        .screen.active { opacity: 1; pointer-events: auto; }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            display: none !important;
+        }
+
         h1 {
-            font-size: 2.4rem; margin-bottom: 10px; color: var(--gold);
-            text-transform: uppercase; letter-spacing: 3px;
-            text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+            font-size: clamp(2.2rem, 9vw, 3.6rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, #ff0055, #bc00dd, #00ffcc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            letter-spacing: 3px;
         }
-        p { font-size: 0.95rem; color: rgba(255,255,255,0.65); margin-bottom: 24px; max-width: 340px; line-height: 1.55; }
-        .btn {
-            background: linear-gradient(135deg, #c0392b, #e74c3c); color: #fff; border: none;
-            padding: 14px 36px; font-size: 1rem; font-weight: 700; border-radius: 50px;
-            cursor: pointer; box-shadow: 0 4px 18px rgba(192,57,43,0.45); text-transform: uppercase;
+
+        .edition-tag {
+            color: var(--accent-cyan);
+            font-weight: 800;
+            font-size: 0.75rem;
+            letter-spacing: 4px;
+            margin-bottom: 18px;
         }
-        .btn:active { transform: scale(0.96); }
-        .popup-text {
-            position: absolute; font-weight: 900; pointer-events: none; z-index: 12;
-            animation: floatUp 1s ease-out forwards;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+
+        .subtitle {
+            color: #8a92b2;
+            margin-bottom: 32px;
+            font-size: 1rem;
+            max-width: 400px;
+            line-height: 1.65;
         }
-        .popup-big {
-            position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
-            font-weight: 900; font-size: 2rem; pointer-events: none; z-index: 15;
-            text-align: center; letter-spacing: 3px; text-transform: uppercase;
-            animation: bigPop 1.4s ease-out forwards;
-            text-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 40px currentColor;
+
+        .demo-blocks {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 28px;
+            justify-content: center;
         }
-        @keyframes floatUp {
-            0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
-            25% { transform: translate(-50%, -70%) scale(1.15); opacity: 1; }
-            100% { transform: translate(-50%, -120%) scale(1); opacity: 0; }
+
+        .demo-block {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         }
-        @keyframes bigPop {
-            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-            20% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-            70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-            100% { transform: translate(-50%, -60%) scale(0.9); opacity: 0; }
+
+        .action-btn {
+            background: linear-gradient(135deg, #ff0055, #bc00dd);
+            border: none;
+            color: white;
+            padding: 16px 42px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 28px var(--glow-pink);
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            pointer-events: auto;
+        }
+
+        .action-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* Juice effects */
+        .flash-red { animation: redAlert 0.4s ease-out; }
+        @keyframes redAlert {
+            0% { box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.5); }
+            100% { box-shadow: inset 0 0 0 transparent; }
+        }
+
+        .flash-green { animation: greenPass 0.3s ease-out; }
+        @keyframes greenPass {
+            0% { box-shadow: inset 0 0 60px rgba(0, 255, 200, 0.25); }
+            100% { box-shadow: inset 0 0 0 transparent; }
+        }
+
+        .shake { animation: shakeAnim 0.3s linear; }
+        @keyframes shakeAnim {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            20%, 60% { transform: translate(-53%, -48%) scale(1.04); }
+            40%, 80% { transform: translate(-47%, -52%) scale(1.04); }
+        }
+
+        .correct-pop { animation: correctPop 0.25s ease-out; }
+        @keyframes correctPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            #options-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .target-card { padding: 20px 16px 18px; border-radius: 20px; }
+            .name-btn { padding: 14px 8px; font-size: 0.82rem; }
+            .question-block-wrap { max-width: 240px; }
+        }
+
+        @media (max-width: 380px) {
+            #options-grid { grid-template-columns: repeat(3, 1fr); }
         }
     </style>
 </head>
 <body>
-<div id="game-container">
-    <canvas id="gameCanvas"></canvas>
-    <div class="top-hud">
-        <div class="hud-title">Apex Archer</div>
-        <div class="hud-row">
-            <div class="stat-pill">
-                <span class="stat-label">LEVEL</span>
-                <span class="stat-value" id="levelVal">1</span>
-            </div>
-            <div class="stat-progress">
-                <div class="progress-head">
-                    <span>SCORE</span>
-                    <span class="nums"><span id="scoreVal">0</span> / <span id="goalVal">20</span></span>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-layer">
+            <div class="hud-brand">ChromaShift</div>
+            <header>
+                <div class="stat-box" id="score-display">
+                    <span class="stat-label">Score</span>
+                    <span class="stat-value">0</span>
                 </div>
-                <div class="progress-track">
-                    <div class="progress-fill" id="scoreProgress"></div>
+                <div class="stat-box" id="level-display">
+                    <span class="stat-label">Level</span>
+                    <span class="stat-value">1</span>
+                </div>
+            </header>
+        </div>
+
+        <div id="target-container">
+            <div class="target-card">
+                <div class="target-hint">What <b>color</b> is the block? — ignore the word</div>
+                <div class="question-block-wrap">
+                    <div class="question-color-block" id="question-color-block">
+                        <div id="illusion-word">READY?</div>
+                    </div>
+                </div>
+                <div id="timer-container">
+                    <div id="timer-bar"></div>
                 </div>
             </div>
-            <div class="stat-pill arrows">
-                <span class="stat-label">ARROWS</span>
-                <span class="stat-value" id="arrowsVal">9</span>
+        </div>
+
+        <div id="choice-panel" class="ui-layer">
+            <div class="panel-label">Pick the color name</div>
+            <div id="options-grid"></div>
+        </div>
+
+        <div id="start-screen" class="screen">
+            <h1>CHROMASHIFT</h1>
+            <p class="edition-tag">[ DUST SETTLE EDITION ]</p>
+            <div class="demo-blocks">
+                <div class="demo-block" style="background:#ff3333"></div>
+                <div class="demo-block" style="background:#3388ff"></div>
+                <div class="demo-block" style="background:#22dd66"></div>
+                <div class="demo-block" style="background:#ffee11"></div>
+                <div class="demo-block" style="background:#b533ff"></div>
             </div>
+            <p class="subtitle">A Stroop-style reflex test. The block shows one color but the word says another — tap the <b>color name</b> that matches the block, not the word!</p>
+            <button class="action-btn" id="start-btn">Play</button>
+        </div>
+
+        <div id="game-over-screen" class="screen hidden">
+            <h1 style="background: linear-gradient(45deg, #ff3333, #ff0055); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">SYSTEM CRASH</h1>
+            <p class="subtitle" id="final-stats">You dissolved into the color void.</p>
+            <button class="action-btn" id="restart-btn" style="background: linear-gradient(135deg, #00ffcc, #0088cc); box-shadow: 0 8px 25px rgba(0, 255, 204, 0.3);">Try Again</button>
         </div>
     </div>
 
-    <div id="startScreen" class="screen active">
-        <h1>Apex Archer</h1>
-        <p>Archer stands in the lower field. Drag back from the bow to aim, release to shoot. Clear 10 levels — each gets faster targets, wind, smaller bullseyes, and higher score goals!</p>
-        <button class="btn" onclick="startGame()">Play</button>
-    </div>
-    <div id="levelClearScreen" class="screen">
-        <h1>Level Clear!</h1>
-        <p id="levelClearDesc">Great shooting!</p>
-        <button class="btn" onclick="nextLevel()">Next Level</button>
-    </div>
-    <div id="gameOverScreen" class="screen">
-        <h1 id="overTitle">Out of Arrows</h1>
-        <p id="overDesc">You didn't reach the level goal.</p>
-        <div class="hud-item" style="margin-bottom:20px">Total Score: <span id="finalScore">0</span></div>
-        <button class="btn" onclick="startGame()">Try Again</button>
-    </div>
-    <div id="winScreen" class="screen">
-        <h1>Champion!</h1>
-        <p>You mastered every level. Total score: <span id="winScore">0</span></p>
-        <button class="btn" onclick="startGame()">Play Again</button>
-    </div>
-</div>
+    <script>
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            },
+            playLaser(isCorrect) {
+                if (!this.ctx) this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
 
-<script>
-const AudioFX = {
-    ctx: null,
-    init() { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
-    play(type) {
-        if (!this.ctx) this.init();
-        if (this.ctx.state === 'suspended') this.ctx.resume();
-        const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        if (type === 'shoot') {
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(180, now);
-            osc.frequency.exponentialRampToValueAtTime(90, now + 0.1);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-            osc.start(now); osc.stop(now + 0.12);
-        } else if (type === 'hit') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(320, now);
-            osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
-            gain.gain.setValueAtTime(0.18, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-            osc.start(now); osc.stop(now + 0.15);
-        } else if (type === 'bullseye') {
-            [523, 659, 784].forEach((f, i) => {
-                const o = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
-                o.type = 'sine';
-                o.frequency.value = f;
-                g.gain.setValueAtTime(0.15, now + i * 0.08);
-                g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.25);
-                o.connect(g); g.connect(this.ctx.destination);
-                o.start(now + i * 0.08); o.stop(now + i * 0.08 + 0.25);
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                const now = this.ctx.currentTime;
+
+                if (isCorrect) {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.linearRampToValueAtTime(40, now + 0.3);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            },
+            playLevelUp() {
+                if (!this.ctx) this.init();
+                const now = this.ctx.currentTime;
+                [440, 554, 659, 880].forEach((f, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, now + i * 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    gain.gain.setValueAtTime(0.1, now + i * 0.08);
+                    gain.gain.linearRampToValueAtTime(0.01, now + i * 0.08 + 0.2);
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + i * 0.08 + 0.2);
+                });
+            }
+        };
+
+        const ALL_COLORS = [
+            { name: 'Red', hex: '#ff3333' },
+            { name: 'Blue', hex: '#3388ff' },
+            { name: 'Green', hex: '#22dd66' },
+            { name: 'Yellow', hex: '#ffee11' },
+            { name: 'Purple', hex: '#b533ff' },
+            { name: 'Orange', hex: '#ff9900' },
+            { name: 'Pink', hex: '#ff66cc' },
+            { name: 'Cyan', hex: '#00f5ff' },
+            { name: 'White', hex: '#ffffff' },
+            { name: 'Lime', hex: '#a6ff00' },
+            { name: 'Lavender', hex: '#cca3ff' },
+            { name: 'Brown', hex: '#996633' },
+            { name: 'Mint', hex: '#b3ffd9' },
+            { name: 'Crimson', hex: '#990033' },
+            { name: 'Gold', hex: '#ffd700' }
+        ];
+
+        let state = {
+            score: 0,
+            level: 1,
+            timeRemaining: 100,
+            currentTrueColor: null,
+            activeColorsList: [],
+            isGameActive: false
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        let gridPlanes = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            init25DGrid();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        class Particle {
+            constructor() {
+                this.reset();
+                this.y = Math.random() * canvas.height;
+            }
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = -20;
+                this.z = Math.random() * 2 + 0.2;
+                this.speedY = (Math.random() * 1.5 + 0.5) * this.z;
+                this.speedX = Math.sin(Math.random() * Math.PI) * 0.3;
+                this.size = Math.random() * 2 + 1;
+                this.color = ALL_COLORS[Math.floor(Math.random() * ALL_COLORS.length)].hex;
+                this.alpha = Math.random() * 0.35 + 0.15;
+            }
+            update() {
+                this.y += this.speedY;
+                this.x += this.speedX;
+                if (this.y > canvas.height) this.reset();
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                const pseudoScale = (this.y / canvas.height) * 1.5 + 0.5;
+                ctx.arc(this.x, this.y, this.size * pseudoScale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function init25DGrid() {
+            gridPlanes = [];
+            for (let i = 0; i < 15; i++) {
+                gridPlanes.push({ yRatio: Math.pow(i / 15, 2) });
+            }
+        }
+
+        function initBackgroundParticles() {
+            particles = [];
+            for (let i = 0; i < 70; i++) particles.push(new Particle());
+        }
+
+        function draw25DBackground() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = 'rgba(0, 255, 204, 0.04)';
+            ctx.lineWidth = 1;
+            const horizonY = canvas.height * 0.35;
+            const floorHeight = canvas.height - horizonY;
+
+            gridPlanes.forEach(plane => {
+                const currentY = horizonY + plane.yRatio * floorHeight;
+                ctx.beginPath();
+                ctx.moveTo(0, currentY);
+                ctx.lineTo(canvas.width, currentY);
+                ctx.stroke();
             });
-            return;
-        } else if (type === 'perfect') {
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(880, now);
-            osc.frequency.setValueAtTime(1100, now + 0.1);
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-            osc.start(now); osc.stop(now + 0.2);
-        } else if (type === 'win') {
-            [440, 554, 659, 880].forEach((f, i) => {
-                const o = this.ctx.createOscillator();
-                const g = this.ctx.createGain();
-                o.type = 'triangle';
-                o.frequency.value = f;
-                g.gain.setValueAtTime(0.14, now + i * 0.12);
-                g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.35);
-                o.connect(g); g.connect(this.ctx.destination);
-                o.start(now + i * 0.12); o.stop(now + i * 0.12 + 0.35);
+
+            const centerX = canvas.width / 2;
+            for (let x = -canvas.width; x <= canvas.width * 2; x += canvas.width / 10) {
+                ctx.beginPath();
+                ctx.moveTo(centerX, horizonY);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            particles.forEach(p => { p.update(); p.draw(); });
+        }
+
+        function getChoicesCountForLevel(lvl) {
+            return Math.min(5 + Math.floor((lvl - 1) * 1.5), 15);
+        }
+
+        function getTimerDrainRate(lvl) {
+            return 0.15 + lvl * 0.04;
+        }
+
+        function updateScoreDisplay() {
+            document.querySelector('#score-display .stat-value').textContent = state.score;
+        }
+
+        function updateLevelDisplay() {
+            document.querySelector('#level-display .stat-value').textContent = state.level;
+        }
+
+        function setupNewTurn() {
+            const optionsCount = getChoicesCountForLevel(state.level);
+            const shuffledColors = [...ALL_COLORS].sort(() => 0.5 - Math.random());
+            state.activeColorsList = shuffledColors.slice(0, optionsCount);
+            state.currentTrueColor = state.activeColorsList[Math.floor(Math.random() * state.activeColorsList.length)];
+
+            const remainingTextColors = state.activeColorsList.filter(c => c.name !== state.currentTrueColor.name);
+            const illusionText = remainingTextColors[Math.floor(Math.random() * remainingTextColors.length)].name;
+
+            const wordEl = document.getElementById('illusion-word');
+            wordEl.textContent = illusionText;
+
+            const blockEl = document.getElementById('question-color-block');
+            const hex = state.currentTrueColor.hex;
+            blockEl.style.background = `linear-gradient(155deg, ${hex}, ${shadeColor(hex, -35)})`;
+            blockEl.style.boxShadow = `0 16px 40px rgba(0,0,0,0.5), 0 0 36px ${hex}55, inset 0 4px 16px rgba(255,255,255,0.2), inset 0 -6px 20px rgba(0,0,0,0.35)`;
+
+            blockEl.style.transform = 'scale(1.06)';
+            setTimeout(() => blockEl.style.transform = 'scale(1)', 120);
+
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            const sortedChoices = [...state.activeColorsList].sort(() => 0.5 - Math.random());
+            sortedChoices.forEach(colorItem => {
+                const btn = document.createElement('button');
+                btn.className = 'name-btn';
+                btn.textContent = colorItem.name;
+
+                btn.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    handleAnswerSelection(colorItem, btn);
+                });
+
+                grid.appendChild(btn);
             });
-            return;
-        } else if (type === 'loss') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(220, now);
-            osc.frequency.exponentialRampToValueAtTime(80, now + 0.5);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-            osc.start(now); osc.stop(now + 0.5);
+
+            state.timeRemaining = 100;
         }
-    }
-};
 
-// Ring bands — classic archery colors (outer → inner drawn in reverse)
-const RINGS = [
-    { max: 0.38, pts: 10, label: 'BULLSEYE!', color: '#ffd700', fill: '#f1c40f', sound: 'bullseye', big: 'BULLSEYE!' },
-    { max: 0.56, pts: 7,  label: '+7', color: '#e74c3c', fill: '#e74c3c', sound: 'perfect', big: 'GREAT SHOT!' },
-    { max: 0.74, pts: 5,  label: '+5', color: '#2980b9', fill: '#3498db', sound: 'hit' },
-    { max: 0.92, pts: 3,  label: '+3', color: '#1a1a1a', fill: '#2c2c2c', sound: 'hit' },
-    { max: 1.00, pts: 1,  label: '+1', color: '#ffffff', fill: '#f5f5f5', sound: 'hit' }
-];
-const BULLSEYE_2D_GRACE = 0.06;
+        function shadeColor(hex, amount) {
+            const num = parseInt(hex.replace('#', ''), 16);
+            const r = Math.min(255, Math.max(0, (num >> 16) + amount));
+            const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
+            const b = Math.min(255, Math.max(0, (num & 0xff) + amount));
+            return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+        }
 
-const LEVELS = [
-    { goal: 20,  arrows: 9, speed: 1.1, wind: 0,    radius: 62 },
-    { goal: 30,  arrows: 9, speed: 1.4, wind: 0.04, radius: 58 },
-    { goal: 42,  arrows: 8, speed: 1.7, wind: 0.07, radius: 55 },
-    { goal: 55,  arrows: 8, speed: 2.0, wind: 0.10, radius: 52 },
-    { goal: 70,  arrows: 8, speed: 2.3, wind: 0.13, radius: 49 },
-    { goal: 86,  arrows: 7, speed: 2.6, wind: 0.16, radius: 46 },
-    { goal: 104, arrows: 7, speed: 2.9, wind: 0.19, radius: 43 },
-    { goal: 124, arrows: 7, speed: 3.2, wind: 0.22, radius: 41 },
-    { goal: 146, arrows: 6, speed: 3.6, wind: 0.26, radius: 38 },
-    { goal: 170, arrows: 6, speed: 4.0, wind: 0.30, radius: 36 }
-];
+        function handleAnswerSelection(selectedColor, btnEl) {
+            if (!state.isGameActive) return;
 
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const container = document.getElementById('game-container');
+            const container = document.getElementById('game-container');
+            const targetCon = document.getElementById('target-container');
 
-let gameState = { active: false, levelIdx: 0, levelScore: 0, totalScore: 0, arrows: 9, windX: 0, windY: 0, waiting: false };
-let player = { x: 0, y: 0, isPulling: false, pullX: 0, pullY: 0, curX: 0, curY: 0, maxPull: 95 };
-let target = null;
-let arrows = [];
-let stuckArrows = [];
-let particles = [];
-let levelAdvanceTimer = null;
-let gameOverTimer = null;
+            if (selectedColor.name === state.currentTrueColor.name) {
+                state.score += 10 * state.level;
+                updateScoreDisplay();
+                AudioEngine.playLaser(true);
 
-function layoutPlayer() {
-    player.x = canvas.width / 2;
-    const pullRoom = Math.max(90, canvas.height * 0.13);
-    player.y = canvas.height - pullRoom;
-    player.maxPull = Math.min(95, pullRoom - 12);
-}
+                if (btnEl) {
+                    btnEl.style.borderColor = '#00ffcc';
+                    btnEl.style.boxShadow = '0 0 20px rgba(0,255,204,0.5)';
+                }
 
-function resizeCanvas() {
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
-    layoutPlayer();
-    if (target) {
-        target.y = canvas.height * 0.20;
-        const lv = getLevel();
-        target.r = lv.radius;
-        target.speed = lv.speed;
-    }
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+                container.classList.add('flash-green');
+                targetCon.classList.add('correct-pop');
+                setTimeout(() => {
+                    container.classList.remove('flash-green');
+                    targetCon.classList.remove('correct-pop');
+                }, 300);
 
-function getLevel() { return LEVELS[Math.min(gameState.levelIdx, LEVELS.length - 1)]; }
+                const structuralNextLevel = Math.floor(state.score / 40) + 1;
+                if (structuralNextLevel > state.level) {
+                    state.level = structuralNextLevel;
+                    updateLevelDisplay();
+                    AudioEngine.playLevelUp();
+                }
 
-function updateHUD() {
-    const lv = getLevel();
-    document.getElementById('levelVal').textContent = gameState.levelIdx + 1;
-    document.getElementById('scoreVal').textContent = gameState.levelScore;
-    document.getElementById('goalVal').textContent = lv.goal;
-    document.getElementById('arrowsVal').textContent = gameState.arrows;
-    const pct = Math.min(100, (gameState.levelScore / lv.goal) * 100);
-    document.getElementById('scoreProgress').style.width = pct + '%';
-}
-
-function hideScreens() {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-}
-
-function spawnTarget() {
-    const lv = getLevel();
-    target = {
-        x: canvas.width / 2,
-        y: canvas.height * 0.20,
-        r: lv.radius,
-        dir: Math.random() > 0.5 ? 1 : -1,
-        speed: lv.speed,
-        pulse: 0
-    };
-    stuckArrows = [];
-    gameState.windX = (Math.random() - 0.5) * lv.wind * 2;
-    gameState.windY = (Math.random() - 0.5) * lv.wind;
-}
-
-function applyLevelToTarget() {
-    if (!target) return;
-    const lv = getLevel();
-    target.r = lv.radius;
-    target.speed = lv.speed;
-    gameState.windX = (Math.random() - 0.5) * lv.wind * 2;
-    gameState.windY = (Math.random() - 0.5) * lv.wind;
-}
-
-function resetPull() {
-    player.isPulling = false;
-}
-
-function canShoot() {
-    return gameState.active && !gameState.waiting && gameState.arrows > 0 && arrows.length === 0;
-}
-
-function startGame() {
-    if (levelAdvanceTimer) { clearTimeout(levelAdvanceTimer); levelAdvanceTimer = null; }
-    if (gameOverTimer) { clearTimeout(gameOverTimer); gameOverTimer = null; }
-    gameState = { active: true, levelIdx: 0, levelScore: 0, totalScore: 0, arrows: LEVELS[0].arrows, windX: 0, windY: 0, waiting: false };
-    arrows = [];
-    stuckArrows = [];
-    particles = [];
-    resetPull();
-    layoutPlayer();
-    spawnTarget();
-    updateHUD();
-    hideScreens();
-}
-
-function tryLevelComplete() {
-    if (gameState.waiting || gameState.levelScore < getLevel().goal) return;
-    gameState.waiting = true;
-    gameState.active = false;
-    resetPull();
-    AudioFX.play('win');
-    showBigPopup('LEVEL CLEAR!', '#2ecc71');
-    if (levelAdvanceTimer) clearTimeout(levelAdvanceTimer);
-    levelAdvanceTimer = setTimeout(() => { levelAdvanceTimer = null; nextLevel(); }, 450);
-}
-
-function nextLevel() {
-    if (gameOverTimer) { clearTimeout(gameOverTimer); gameOverTimer = null; }
-    gameState.levelIdx++;
-    if (gameState.levelIdx >= LEVELS.length) {
-        gameState.active = false;
-        resetPull();
-        document.getElementById('winScore').textContent = gameState.totalScore;
-        hideScreens();
-        document.getElementById('winScreen').classList.add('active');
-        AudioFX.play('win');
-        return;
-    }
-    const lv = getLevel();
-    gameState.levelScore = 0;
-    gameState.arrows = lv.arrows;
-    gameState.waiting = false;
-    gameState.active = true;
-    arrows = [];
-    stuckArrows = [];
-    particles = [];
-    resetPull();
-    layoutPlayer();
-    spawnTarget();
-    updateHUD();
-    hideScreens();
-    showBigPopup('LEVEL ' + (gameState.levelIdx + 1), '#f1c40f');
-}
-
-function levelClear() {
-    tryLevelComplete();
-}
-
-function gameOver() {
-    gameState.active = false;
-    resetPull();
-    AudioFX.play('loss');
-    document.getElementById('finalScore').textContent = gameState.totalScore;
-    document.getElementById('overDesc').textContent =
-        'Needed ' + getLevel().goal + ' pts — you scored ' + gameState.levelScore + '.';
-    hideScreens();
-    document.getElementById('gameOverScreen').classList.add('active');
-}
-
-function checkEndOfTurn() {
-    if (gameState.waiting) return;
-    if (arrows.length > 0) return;
-    if (gameState.levelScore >= getLevel().goal) {
-        tryLevelComplete();
-        return;
-    }
-    if (gameState.arrows <= 0) {
-        if (gameOverTimer) return;
-        gameOverTimer = setTimeout(() => {
-            gameOverTimer = null;
-            if (gameState.waiting || gameState.levelScore >= getLevel().goal) return;
-            if (gameState.arrows > 0 || arrows.length > 0) return;
-            gameOver();
-        }, 600);
-    }
-}
-
-function scoreFromDist(dist, r) {
-    const ratio = dist / r;
-    if (ratio <= RINGS[0].max + BULLSEYE_2D_GRACE) return RINGS[0];
-    for (let i = 0; i < RINGS.length; i++) {
-        if (ratio <= RINGS[i].max) return RINGS[i];
-    }
-    return null;
-}
-
-function registerArrowHit(stickX, stickY, stickAngle, dist) {
-    const ring = scoreFromDist(dist, target.r);
-    if (!ring) return;
-    const offX = stickX - target.x;
-    const offY = stickY - target.y;
-    stuckArrows.push({
-        offX: offX, offY: offY,
-        angle: stickAngle,
-        depth: dist / target.r
-    });
-    gameState.levelScore += ring.pts;
-    gameState.totalScore += ring.pts;
-    AudioFX.play(ring.sound);
-    const rect = canvas.getBoundingClientRect();
-    const sx = rect.left + (stickX / canvas.width) * rect.width;
-    const sy = rect.top + (stickY / canvas.height) * rect.height;
-    showPopup(sx, sy - 20, ring.label + ' +' + ring.pts, ring.color);
-    if (ring.big) showBigPopup(ring.big, ring.color);
-    for (let p = 0; p < 10; p++) {
-        particles.push({
-            x: stickX, y: stickY,
-            vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
-            r: Math.random() * 3 + 1, alpha: 1, color: ring.color
-        });
-    }
-    updateHUD();
-    if (gameState.levelScore >= getLevel().goal) {
-        tryLevelComplete();
-    }
-}
-
-function drawArrowGraphic(len, thick) {
-    const L = len || 34;
-    const t = thick || 3.5;
-    const shaftEnd = -L + 10;
-
-    // Outline for contrast on bright target
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = t + 2.5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(shaftEnd, 0);
-    ctx.lineTo(-9, 0);
-    ctx.stroke();
-
-    // Carbon shaft
-    const shaftGrad = ctx.createLinearGradient(shaftEnd, -t, shaftEnd, t);
-    shaftGrad.addColorStop(0, '#1a1a1a');
-    shaftGrad.addColorStop(0.45, '#4a4a4a');
-    shaftGrad.addColorStop(0.55, '#4a4a4a');
-    shaftGrad.addColorStop(1, '#1a1a1a');
-    ctx.strokeStyle = shaftGrad;
-    ctx.lineWidth = t;
-    ctx.beginPath();
-    ctx.moveTo(shaftEnd, 0);
-    ctx.lineTo(-9, 0);
-    ctx.stroke();
-
-    // Gold binding wrap
-    ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(shaftEnd + 2, -t * 0.9, 5, t * 1.8);
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(shaftEnd + 4, -t * 0.5, 1, t);
-
-    // Metallic broadhead
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.moveTo(2, 0);
-    ctx.lineTo(-11, -5);
-    ctx.lineTo(-9, 0);
-    ctx.lineTo(-11, 5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#d0d0d0';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-10, -4.2);
-    ctx.lineTo(-8, 0);
-    ctx.lineTo(-10, 4.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath();
-    ctx.moveTo(-1, 0);
-    ctx.lineTo(-7, -2);
-    ctx.lineTo(-6, 0);
-    ctx.lineTo(-7, 2);
-    ctx.closePath();
-    ctx.fill();
-
-    // Dark crimson fletching
-    const fW = 5.5, fH = 7;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(shaftEnd - 1, -fH / 2 - 1, 9, fH + 2);
-    ctx.fillStyle = '#8b0000';
-    ctx.beginPath();
-    ctx.moveTo(shaftEnd, 0);
-    ctx.lineTo(shaftEnd - 8, -fH / 2);
-    ctx.lineTo(shaftEnd - 5, 0);
-    ctx.lineTo(shaftEnd - 8, fH / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#e74c3c';
-    ctx.beginPath();
-    ctx.moveTo(shaftEnd, 0);
-    ctx.lineTo(shaftEnd - 6, -fH / 2 + 1);
-    ctx.lineTo(shaftEnd - 4, 0);
-    ctx.lineTo(shaftEnd - 6, fH / 2 - 1);
-    ctx.closePath();
-    ctx.fill();
-}
-
-function drawBowArc(radius, pullDist) {
-    const r = radius;
-
-    // Outer gold aura
-    ctx.strokeStyle = 'rgba(241,196,15,0.28)';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.stroke();
-
-    // Bow limb shadow
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 9;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.stroke();
-
-    // Main dark limb
-    const bowGrad = ctx.createLinearGradient(-r, 0, r, 0);
-    bowGrad.addColorStop(0, '#0a0a0a');
-    bowGrad.addColorStop(0.5, '#2a2a2a');
-    bowGrad.addColorStop(1, '#0a0a0a');
-    ctx.strokeStyle = bowGrad;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
-    ctx.stroke();
-
-    // Gold edge highlight
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(0, 0, r - 2.5, -Math.PI / 2, Math.PI / 2);
-    ctx.stroke();
-
-    // Grip wrap
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(-4, -7, 8, 14);
-    ctx.fillStyle = '#c0392b';
-    ctx.fillRect(-3, -5, 6, 10);
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 0.8;
-    ctx.strokeRect(-3, -5, 6, 10);
-
-    // String
-    const notch = pullDist > 0 ? -pullDist * 0.75 : 0;
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.lineTo(notch, 0);
-    ctx.lineTo(0, r);
-    ctx.stroke();
-    ctx.strokeStyle = pullDist > 0 ? '#fff' : 'rgba(255,255,255,0.75)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, -r);
-    ctx.lineTo(notch, 0);
-    ctx.lineTo(0, r);
-    ctx.stroke();
-
-    // Nocked arrow on string when pulling
-    if (pullDist > 0) {
-        ctx.save();
-        ctx.translate(notch, 0);
-        drawArrowGraphic(36, 3);
-        ctx.restore();
-    }
-}
-
-function canvasPos(clientX, clientY) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-        x: (clientX - rect.left) * (canvas.width / rect.width),
-        y: (clientY - rect.top) * (canvas.height / rect.height)
-    };
-}
-
-function showPopup(x, y, text, color, size) {
-    const el = document.createElement('div');
-    el.className = 'popup-text';
-    el.style.left = x + 'px';
-    el.style.top = y + 'px';
-    el.style.color = color;
-    el.style.fontSize = (size || 1.6) + 'rem';
-    el.textContent = text;
-    container.appendChild(el);
-    setTimeout(() => el.remove(), 1000);
-}
-
-function showBigPopup(text, color) {
-    const el = document.createElement('div');
-    el.className = 'popup-big';
-    el.style.color = color;
-    el.innerHTML = text;
-    container.appendChild(el);
-    setTimeout(() => el.remove(), 1400);
-}
-
-function screenPopup(text, color) {
-    const rect = canvas.getBoundingClientRect();
-    showPopup(rect.left + rect.width / 2, rect.top + rect.height * 0.38, text, color, 1.4);
-}
-
-function getEventPos(e) {
-    const t = e.touches ? e.touches[0] : e;
-    return canvasPos(t.clientX, t.clientY);
-}
-
-function clampPull(x, y) {
-    const pad = 16;
-    const maxY = canvas.height - pad;
-    const minY = player.y - player.maxPull;
-    return {
-        x: Math.max(pad, Math.min(canvas.width - pad, x)),
-        y: Math.max(Math.min(minY, player.y), Math.min(maxY, y))
-    };
-}
-
-function handleStart(e) {
-    if (!canShoot()) { resetPull(); return; }
-    e.preventDefault();
-    AudioFX.init();
-    const pos = clampPull(getEventPos(e).x, getEventPos(e).y);
-    player.isPulling = true;
-    player.pullX = player.x;
-    player.pullY = player.y;
-    player.curX = pos.x;
-    player.curY = pos.y;
-}
-
-function handleMove(e) {
-    if (!player.isPulling) return;
-    if (!canShoot()) { resetPull(); return; }
-    e.preventDefault();
-    const pos = clampPull(getEventPos(e).x, getEventPos(e).y);
-    player.curX = pos.x;
-    player.curY = pos.y;
-}
-
-function handleEnd(e) {
-    if (!player.isPulling) return;
-    player.isPulling = false;
-    if (!canShoot()) return;
-
-    let dx = player.pullX - player.curX;
-    let dy = player.pullY - player.curY;
-    let dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > player.maxPull) {
-        const scale = player.maxPull / dist;
-        dx *= scale;
-        dy *= scale;
-        dist = player.maxPull;
-    }
-    if (dist < 14) return;
-
-    const angle = Math.atan2(dy, dx);
-    const force = (dist / player.maxPull) * (19 - gameState.levelIdx * 0.3);
-
-    arrows.push({
-        x: player.x, y: player.y,
-        vx: Math.cos(angle) * force,
-        vy: Math.sin(angle) * force,
-        angle: angle,
-        piercing: false,
-        bestDist: Infinity,
-        stickX: 0, stickY: 0, stickAngle: 0,
-        pierceFrames: 0
-    });
-    gameState.arrows--;
-    updateHUD();
-    AudioFX.play('shoot');
-}
-
-function handleCancel() {
-    resetPull();
-}
-
-canvas.addEventListener('mousedown', handleStart);
-canvas.addEventListener('mousemove', handleMove);
-canvas.addEventListener('mouseup', handleEnd);
-canvas.addEventListener('mouseleave', handleCancel);
-canvas.addEventListener('touchstart', handleStart, { passive: false });
-canvas.addEventListener('touchmove', handleMove, { passive: false });
-canvas.addEventListener('touchend', handleEnd);
-canvas.addEventListener('touchcancel', handleCancel);
-window.addEventListener('mouseup', handleEnd);
-window.addEventListener('touchend', handleEnd);
-
-function update() {
-    if (!gameState.active || !target) return;
-
-    target.x += target.speed * target.dir;
-    target.pulse += 0.04;
-    const margin = target.r + 20;
-    if (target.x - margin < 0 || target.x + margin > canvas.width) target.dir *= -1;
-
-    for (let i = arrows.length - 1; i >= 0; i--) {
-        const a = arrows[i];
-        const tx = target.x, ty = target.y, tr = target.r;
-
-        if (!a.piercing) {
-            a.vx += gameState.windX;
-            a.vy += gameState.windY + 0.12;
-            a.x += a.vx;
-            a.y += a.vy;
-            a.angle = Math.atan2(a.vy, a.vx);
-
-            if (a.y < -60 || a.x < -60 || a.x > canvas.width + 60 || a.y > canvas.height + 60) {
-                arrows.splice(i, 1);
-                checkEndOfTurn();
-                continue;
-            }
-
-            const tipDist = Math.hypot(a.x - tx, a.y - ty);
-            if (tipDist <= tr) {
-                a.piercing = true;
-                a.bestDist = tipDist;
-                a.stickX = a.x; a.stickY = a.y; a.stickAngle = a.angle;
-                a.pierceFrames = 0;
-                a.vx *= 0.25;
-                a.vy *= 0.25;
-            }
-        } else {
-            a.vx += gameState.windX * 0.2;
-            a.vy += gameState.windY * 0.2 + 0.06;
-            a.x += a.vx;
-            a.y += a.vy;
-            a.angle = Math.atan2(a.vy, a.vx);
-            a.pierceFrames++;
-
-            const tipDist = Math.hypot(a.x - tx, a.y - ty);
-            if (tipDist <= tr && tipDist < a.bestDist) {
-                a.bestDist = tipDist;
-                a.stickX = a.x;
-                a.stickY = a.y;
-                a.stickAngle = a.angle;
-            }
-
-            a.vx *= 0.88;
-            a.vy *= 0.88;
-
-            const speed = Math.hypot(a.vx, a.vy);
-            const leftTarget = tipDist > tr;
-            const settled = a.pierceFrames > 2 && speed < 0.35;
-            const timedOut = a.pierceFrames > 18;
-
-            if (leftTarget || settled || timedOut) {
-                registerArrowHit(a.stickX, a.stickY, a.stickAngle, a.bestDist);
-                arrows.splice(i, 1);
-                checkEndOfTurn();
+                setupNewTurn();
+            } else {
+                if (btnEl) {
+                    btnEl.style.borderColor = '#ff0055';
+                    btnEl.style.boxShadow = '0 0 20px rgba(255,0,85,0.5)';
+                }
+                triggerFailureJuice();
             }
         }
-    }
 
-    for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].x += particles[i].vx;
-        particles[i].y += particles[i].vy;
-        particles[i].alpha -= 0.04;
-        if (particles[i].alpha <= 0) particles.splice(i, 1);
-    }
-}
+        function triggerFailureJuice() {
+            AudioEngine.playLaser(false);
+            const container = document.getElementById('game-container');
+            const targetCon = document.getElementById('target-container');
 
-function drawBackground() {
-    const h = canvas.height, w = canvas.width;
-    if (Math.abs(gameState.windX) > 0.02) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 1;
-        for (let y = 20; y < h * 0.55; y += 35) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y + gameState.windX * 80);
-            ctx.stroke();
+            container.classList.add('flash-red');
+            targetCon.classList.add('shake');
+
+            setTimeout(() => {
+                container.classList.remove('flash-red');
+                targetCon.classList.remove('shake');
+                endGame();
+            }, 400);
         }
-    }
-}
 
-function drawTarget() {
-    if (!target) return;
-    const t = target;
-    ctx.save();
-    ctx.translate(t.x, t.y);
-
-    // Target stand
-    ctx.fillStyle = '#5d4037';
-    ctx.fillRect(-4, t.r + 6, 8, 36);
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.beginPath();
-    ctx.ellipse(0, t.r + 10, t.r * 0.85, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Ring face — outer to inner
-    for (let i = RINGS.length - 1; i >= 0; i--) {
-        ctx.fillStyle = RINGS[i].fill;
-        ctx.beginPath();
-        ctx.arc(0, 0, t.r * RINGS[i].max, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Ring divider lines
-    RINGS.forEach(ring => {
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, t.r * ring.max, 0, Math.PI * 2);
-        ctx.stroke();
-    });
-
-    // Stuck arrows — drawn ON the face where they actually landed
-    stuckArrows.sort((a, b) => b.depth - a.depth);
-    stuckArrows.forEach(sa => {
-        ctx.save();
-        ctx.translate(sa.offX, sa.offY);
-        ctx.rotate(sa.angle);
-        drawArrowGraphic(32, 3.5);
-        ctx.restore();
-    });
-
-    // Outer wooden rim
-    ctx.strokeStyle = '#4e342e';
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.arc(0, 0, t.r + 3, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = '#6d4c41';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawArcher() {
-    const x = player.x, y = player.y;
-    ctx.save();
-    ctx.translate(x, y);
-
-    // Ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.beginPath();
-    ctx.ellipse(0, 10, 28, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Dark platform / footing
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(-22, 4, 44, 7);
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-22, 4, 44, 7);
-
-    // Cloaked body silhouette
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.moveTo(-16, 4);
-    ctx.lineTo(-22, -38);
-    ctx.lineTo(0, -52);
-    ctx.lineTo(22, -38);
-    ctx.lineTo(16, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#141414';
-    ctx.beginPath();
-    ctx.moveTo(-10, 4);
-    ctx.lineTo(-14, -32);
-    ctx.lineTo(0, -44);
-    ctx.lineTo(14, -32);
-    ctx.lineTo(10, 4);
-    ctx.closePath();
-    ctx.fill();
-
-    // Hood & head
-    ctx.fillStyle = '#0d0d0d';
-    ctx.beginPath();
-    ctx.arc(0, -46, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#1c1c1c';
-    ctx.beginPath();
-    ctx.arc(0, -46, 7, 0, Math.PI * 2);
-    ctx.fill();
-    // Eyes — high contrast slit
-    ctx.fillStyle = '#f1c40f';
-    ctx.fillRect(-5, -47, 3, 2);
-    ctx.fillRect(2, -47, 3, 2);
-
-    // Shoulder armor accents
-    ctx.strokeStyle = '#f1c40f';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-18, -28);
-    ctx.lineTo(-8, -22);
-    ctx.moveTo(18, -28);
-    ctx.lineTo(8, -22);
-    ctx.stroke();
-    ctx.fillStyle = '#c0392b';
-    ctx.fillRect(-20, -30, 5, 5);
-    ctx.fillRect(15, -30, 5, 5);
-
-    if (player.isPulling) {
-        let dx = player.pullX - player.curX;
-        let dy = player.pullY - player.curY;
-        let dist = Math.min(Math.sqrt(dx * dx + dy * dy), player.maxPull);
-        let angle = Math.atan2(dy, dx);
-        ctx.rotate(angle);
-        drawBowArc(44, dist);
-
-        ctx.restore();
-        ctx.save();
-        // Aim trajectory — bright dots on dark bg
-        ctx.fillStyle = 'rgba(241,196,15,0.55)';
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-        ctx.lineWidth = 1;
-        let tx = x, ty = y;
-        let tvx = Math.cos(angle) * (dist / player.maxPull * 20);
-        let tvy = Math.sin(angle) * (dist / player.maxPull * 20);
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        for (let s = 0; s < 22; s++) {
-            tvx += gameState.windX;
-            tvy += gameState.windY + 0.12;
-            tx += tvx; ty += tvy;
-            ctx.lineTo(tx, ty);
-            ctx.beginPath();
-            ctx.arc(tx, ty, Math.max(1.2, 3.2 - s * 0.12), 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(tx, ty);
+        function endGame() {
+            state.isGameActive = false;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-stats').innerHTML =
+                `You survived up to <b>Level ${state.level}</b><br>Final Score: <b>${state.score}</b>`;
         }
-        ctx.restore();
-    } else {
-        drawBowArc(40, 0);
-        ctx.restore();
-    }
-}
 
-function drawFlyingArrows() {
-    arrows.forEach(a => {
-        ctx.save();
-        ctx.translate(a.x, a.y);
-        ctx.rotate(a.angle);
-        // Motion trail
-        ctx.strokeStyle = 'rgba(241,196,15,0.35)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(-8, 0);
-        ctx.lineTo(-22, 0);
-        ctx.stroke();
-        drawArrowGraphic(36, 3.5);
-        ctx.restore();
-    });
-}
+        function startGame() {
+            AudioEngine.init();
+            state.score = 0;
+            state.level = 1;
+            state.isGameActive = true;
+            updateScoreDisplay();
+            updateLevelDisplay();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            setupNewTurn();
+        }
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawBackground();
-    drawTarget();
-    drawArcher();
-    drawFlyingArrows();
-    particles.forEach(p => {
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-    });
-}
+        function engineLoop() {
+            draw25DBackground();
 
-function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-}
-loop();
-</script>
+            if (state.isGameActive) {
+                state.timeRemaining -= getTimerDrainRate(state.level);
+                document.getElementById('timer-bar').style.width = `${Math.max(0, state.timeRemaining)}%`;
+
+                if (state.timeRemaining <= 0) triggerFailureJuice();
+            }
+
+            requestAnimationFrame(engineLoop);
+        }
+
+        resizeCanvas();
+        initBackgroundParticles();
+        requestAnimationFrame(engineLoop);
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+    </script>
 </body>
 </html>
