@@ -44,7 +44,10 @@
     display:flex;flex-direction:column;align-items:center;
     padding-top:calc(18px + env(safe-area-inset-top));
     pointer-events:none;
+    opacity:0;
+    transition:opacity .45s ease;
   }
+  #hud.visible{opacity:1;}
   .score-wrap{
     display:flex;align-items:baseline;gap:6px;
     filter:drop-shadow(0 0 18px rgba(0,229,255,0.55));
@@ -91,15 +94,15 @@
   #titleScreen{
     position:absolute;inset:0;z-index:30;
     display:flex;flex-direction:column;align-items:center;
-    justify-content:flex-start;
-    padding-top:calc(48px + env(safe-area-inset-top));
+    justify-content:center;
+    padding:calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
     transition:opacity .5s ease, transform .5s ease;
   }
   #titleScreen.hidden{opacity:0;transform:scale(1.05);pointer-events:none;}
 
   .logo{
     text-align:center;
-    line-height:0.82;
+    line-height:1.1;
     filter:drop-shadow(0 6px 0 rgba(0,0,0,0.35)) drop-shadow(0 0 30px rgba(255,46,156,0.4));
   }
   .logo .l1{
@@ -122,25 +125,18 @@
     -webkit-background-clip:text;background-clip:text;color:transparent;
     letter-spacing:1px;
     -webkit-text-stroke:1.5px rgba(255,255,255,0.2);
-    margin-top:-2vw;
+    margin-top:0.22em;
   }
   @media (min-width:480px){
     .logo .l1{font-size:64px;}
     .logo .l2{font-size:84px;}
   }
 
-  .tagline{
-    margin-top:14px;
-    font-size:14px;letter-spacing:6px;font-weight:600;
-    color:rgba(255,255,255,0.5);
-    text-transform:uppercase;
-  }
-
   .spacer{flex:1;}
 
   #playBtn{
     pointer-events:all;
-    margin-bottom:calc(30px + env(safe-area-inset-bottom));
+    margin-top:48px;
     width:118px;height:118px;border-radius:50%;
     background:
       radial-gradient(circle at 35% 30%, #ff9a4d, var(--orange) 45%, #c94f00 100%);
@@ -161,27 +157,6 @@
     0%,100%{transform:scale(1);}
     50%{transform:scale(1.045);}
   }
-  #hopLabel{
-    pointer-events:none;
-    position:absolute;
-    bottom:calc(6px + env(safe-area-inset-bottom));
-    left:0;right:0;
-    text-align:center;
-    font-family:'Orbitron',sans-serif;
-    font-weight:700;
-    font-size:11px;letter-spacing:3px;
-    color:rgba(255,255,255,0.55);
-  }
-
-  /* instructions row */
-  .howto{
-    pointer-events:none;
-    display:flex;gap:22px;margin-top:18px;
-    color:rgba(255,255,255,0.55);
-    font-size:12.5px;letter-spacing:1px;font-weight:600;
-  }
-  .howto .item{display:flex;flex-direction:column;align-items:center;gap:6px;}
-  .howto svg{width:26px;height:26px;fill:var(--cyan);opacity:0.85;filter:drop-shadow(0 0 6px rgba(0,229,255,0.5));}
 
   /* ---------- GAME OVER ---------- */
   #gameOverScreen{
@@ -319,26 +294,9 @@
       <span class="l1">SPIRAL</span>
       <span class="l2">DROP</span>
     </div>
-    <div class="tagline">Twist &middot; Dodge &middot; Fall</div>
-    <div class="howto">
-      <div class="item">
-        <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v14.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V3a1 1 0 0 1 1-1z"/></svg>
-        <span>DROP</span>
-      </div>
-      <div class="item">
-        <svg viewBox="0 0 24 24"><path d="M7.5 21.5C4 20 2 16.6 2 13c0-4.7 3.5-8.4 8-8.9V2l4 3-4 3V6.1C6.6 6.6 4 9.5 4 13c0 2.8 1.5 5.3 4 6.7l-.5 1.8zM16.5 2.5C20 4 22 7.4 22 11c0 4.7-3.5 8.4-8 8.9V22l-4-3 4-3v2.1c3.4-.5 6-3.4 6-6.9 0-2.8-1.5-5.3-4-6.7l.5-1.8z"/></svg>
-        <span>ROTATE</span>
-      </div>
-      <div class="item">
-        <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7v8l10-12h-7z"/></svg>
-        <span>SURVIVE</span>
-      </div>
-    </div>
-    <div class="spacer"></div>
     <button id="playBtn" aria-label="Play">
       <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
     </button>
-    <div id="hopLabel">TAP TO HOP IN</div>
   </div>
 
   <!-- Game Over -->
@@ -790,9 +748,10 @@ let shakeTime = 0;
 let prevBallY = -1.2;
 
 const GRAVITY = -11.5;
-// Bounce reaches ~one layer gap height: h = v²/(2g) → v = sqrt(2*g*h)
-const BOUNCE_VEL = Math.sqrt(2 * Math.abs(GRAVITY) * LAYER_GAP * 0.9);
-const MAX_UPWARD_VEL = BOUNCE_VEL * 1.08;
+// Bounce peak ≤ one stack gap: h = v²/(2g)
+const BOUNCE_HEIGHT = LAYER_GAP * 0.78;
+const BOUNCE_VEL = Math.sqrt(2 * Math.abs(GRAVITY) * BOUNCE_HEIGHT);
+const MAX_UPWARD_VEL = BOUNCE_VEL;
 
 function clearTower(){
   layers.forEach(l=>l.destroy());
@@ -960,6 +919,7 @@ function startGame(){
   Audio_.swoosh();
   titleScreen.classList.add('hidden');
   gameOverScreen.classList.remove('show');
+  document.getElementById('hud').classList.add('visible');
   resetGame();
   gameState = 'playing';
   setTimeout(()=>{ dragHint.classList.add('show'); setTimeout(()=>dragHint.classList.remove('show'), 2200); }, 400);
