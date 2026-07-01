@@ -511,7 +511,7 @@ function worldAngleToLocal(layerGroup, worldAngle){
   return a;
 }
 
-const LAYER_GAP = 1.85;
+const LAYER_GAP = 2.05;
 const TOWER_RADIUS = 2.35;
 const LAYER_HEIGHT = 0.34;
 const LAYER_TOP = LAYER_HEIGHT / 2;
@@ -754,7 +754,7 @@ let prevBallY = -1.2;
 
 const GRAVITY = -11.5;
 // Bounce peak ≤ one stack gap: h = v²/(2g)
-const BOUNCE_HEIGHT = LAYER_GAP * 0.78;
+const BOUNCE_HEIGHT = LAYER_GAP * 0.66;
 const BOUNCE_VEL = Math.sqrt(2 * Math.abs(GRAVITY) * BOUNCE_HEIGHT);
 const MAX_UPWARD_VEL = BOUNCE_VEL;
 
