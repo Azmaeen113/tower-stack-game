@@ -146,7 +146,7 @@
 
     <div id="startScreen" class="screen active">
         <h1>Apex Archer</h1>
-        <p>Archer stands below. Drag back from the bow to aim, release to shoot. Hit the moving target at the top. Score 20 points in 9 arrows to clear Level 1!</p>
+        <p>Archer stands in the lower field. Drag back from the bow to aim, release to shoot. Clear 10 levels — each gets faster targets, wind, smaller bullseyes, and higher score goals!</p>
         <button class="btn" onclick="startGame()">Play</button>
     </div>
     <div id="levelClearScreen" class="screen">
@@ -246,14 +246,16 @@ const RINGS = [
 const BULLSEYE_2D_GRACE = 0.06;
 
 const LEVELS = [
-    { goal: 20, arrows: 9, speed: 1.4, wind: 0,    radius: 58 },
-    { goal: 35, arrows: 9, speed: 1.8, wind: 0.08, radius: 54 },
-    { goal: 50, arrows: 8, speed: 2.2, wind: 0.12, radius: 50 },
-    { goal: 68, arrows: 8, speed: 2.6, wind: 0.16, radius: 47 },
-    { goal: 88, arrows: 7, speed: 3.0, wind: 0.20, radius: 44 },
-    { goal: 110, arrows: 7, speed: 3.4, wind: 0.24, radius: 42 },
-    { goal: 135, arrows: 6, speed: 3.8, wind: 0.28, radius: 40 },
-    { goal: 165, arrows: 6, speed: 4.2, wind: 0.32, radius: 38 }
+    { goal: 20,  arrows: 9, speed: 1.1, wind: 0,    radius: 62 },
+    { goal: 30,  arrows: 9, speed: 1.4, wind: 0.04, radius: 58 },
+    { goal: 42,  arrows: 8, speed: 1.7, wind: 0.07, radius: 55 },
+    { goal: 55,  arrows: 8, speed: 2.0, wind: 0.10, radius: 52 },
+    { goal: 70,  arrows: 8, speed: 2.3, wind: 0.13, radius: 49 },
+    { goal: 86,  arrows: 7, speed: 2.6, wind: 0.16, radius: 46 },
+    { goal: 104, arrows: 7, speed: 2.9, wind: 0.19, radius: 43 },
+    { goal: 124, arrows: 7, speed: 3.2, wind: 0.22, radius: 41 },
+    { goal: 146, arrows: 6, speed: 3.6, wind: 0.26, radius: 38 },
+    { goal: 170, arrows: 6, speed: 4.0, wind: 0.30, radius: 36 }
 ];
 
 const canvas = document.getElementById('gameCanvas');
@@ -261,17 +263,30 @@ const ctx = canvas.getContext('2d');
 const container = document.getElementById('game-container');
 
 let gameState = { active: false, levelIdx: 0, levelScore: 0, totalScore: 0, arrows: 9, windX: 0, windY: 0, waiting: false };
-let player = { x: 0, y: 0, isPulling: false, pullX: 0, pullY: 0, curX: 0, curY: 0, maxPull: 110 };
+let player = { x: 0, y: 0, isPulling: false, pullX: 0, pullY: 0, curX: 0, curY: 0, maxPull: 95 };
 let target = null;
 let arrows = [];
 let stuckArrows = [];
 let particles = [];
+let levelAdvanceTimer = null;
+
+function layoutPlayer() {
+    player.x = canvas.width / 2;
+    const pullRoom = Math.max(90, canvas.height * 0.13);
+    player.y = canvas.height - pullRoom;
+    player.maxPull = Math.min(95, pullRoom - 12);
+}
 
 function resizeCanvas() {
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
-    player.x = canvas.width / 2;
-    player.y = canvas.height - 72;
+    layoutPlayer();
+    if (target) {
+        target.y = canvas.height * 0.20;
+        const lv = getLevel();
+        target.r = lv.radius;
+        target.speed = lv.speed;
+    }
 }
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
@@ -296,32 +311,63 @@ function spawnTarget() {
     const lv = getLevel();
     target = {
         x: canvas.width / 2,
-        y: canvas.height * 0.22,
+        y: canvas.height * 0.20,
         r: lv.radius,
         dir: Math.random() > 0.5 ? 1 : -1,
         speed: lv.speed,
         pulse: 0
     };
     stuckArrows = [];
-    gameState.windX = (Math.random() - 0.5) * lv.wind;
-    gameState.windY = (Math.random() - 0.5) * lv.wind * 0.4;
+    gameState.windX = (Math.random() - 0.5) * lv.wind * 2;
+    gameState.windY = (Math.random() - 0.5) * lv.wind;
+}
+
+function applyLevelToTarget() {
+    if (!target) return;
+    const lv = getLevel();
+    target.r = lv.radius;
+    target.speed = lv.speed;
+    gameState.windX = (Math.random() - 0.5) * lv.wind * 2;
+    gameState.windY = (Math.random() - 0.5) * lv.wind;
+}
+
+function resetPull() {
+    player.isPulling = false;
+}
+
+function canShoot() {
+    return gameState.active && !gameState.waiting && gameState.arrows > 0 && arrows.length === 0;
 }
 
 function startGame() {
+    if (levelAdvanceTimer) { clearTimeout(levelAdvanceTimer); levelAdvanceTimer = null; }
     gameState = { active: true, levelIdx: 0, levelScore: 0, totalScore: 0, arrows: LEVELS[0].arrows, windX: 0, windY: 0, waiting: false };
     arrows = [];
     stuckArrows = [];
     particles = [];
-    player.isPulling = false;
+    resetPull();
+    layoutPlayer();
     spawnTarget();
     updateHUD();
     hideScreens();
+}
+
+function tryLevelComplete() {
+    if (gameState.waiting || gameState.levelScore < getLevel().goal) return;
+    gameState.waiting = true;
+    gameState.active = false;
+    resetPull();
+    AudioFX.play('win');
+    showBigPopup('LEVEL CLEAR!', '#2ecc71');
+    if (levelAdvanceTimer) clearTimeout(levelAdvanceTimer);
+    levelAdvanceTimer = setTimeout(() => { levelAdvanceTimer = null; nextLevel(); }, 450);
 }
 
 function nextLevel() {
     gameState.levelIdx++;
     if (gameState.levelIdx >= LEVELS.length) {
         gameState.active = false;
+        resetPull();
         document.getElementById('winScore').textContent = gameState.totalScore;
         hideScreens();
         document.getElementById('winScreen').classList.add('active');
@@ -332,7 +378,12 @@ function nextLevel() {
     gameState.levelScore = 0;
     gameState.arrows = lv.arrows;
     gameState.waiting = false;
+    gameState.active = true;
     arrows = [];
+    stuckArrows = [];
+    particles = [];
+    resetPull();
+    layoutPlayer();
     spawnTarget();
     updateHUD();
     hideScreens();
@@ -340,18 +391,12 @@ function nextLevel() {
 }
 
 function levelClear() {
-    gameState.active = false;
-    gameState.waiting = true;
-    AudioFX.play('win');
-    showBigPopup('LEVEL CLEAR!', '#2ecc71');
-    document.getElementById('levelClearDesc').textContent =
-        'Score: ' + gameState.levelScore + ' · Total: ' + gameState.totalScore;
-    hideScreens();
-    document.getElementById('levelClearScreen').classList.add('active');
+    tryLevelComplete();
 }
 
 function gameOver() {
     gameState.active = false;
+    resetPull();
     AudioFX.play('loss');
     document.getElementById('finalScore').textContent = gameState.totalScore;
     document.getElementById('overDesc').textContent =
@@ -364,7 +409,7 @@ function checkEndOfTurn() {
     if (gameState.waiting) return;
     if (arrows.length > 0) return;
     if (gameState.levelScore >= getLevel().goal) {
-        setTimeout(levelClear, 600);
+        tryLevelComplete();
         return;
     }
     if (gameState.arrows <= 0) {
@@ -407,6 +452,10 @@ function registerArrowHit(stickX, stickY, stickAngle, dist) {
         });
     }
     updateHUD();
+    if (gameState.levelScore >= getLevel().goal) {
+        tryLevelComplete();
+        return;
+    }
     checkEndOfTurn();
 }
 
@@ -462,22 +511,33 @@ function getEventPos(e) {
     return canvasPos(t.clientX, t.clientY);
 }
 
+function clampPull(x, y) {
+    const pad = 16;
+    const maxY = canvas.height - pad;
+    const minY = player.y - player.maxPull;
+    return {
+        x: Math.max(pad, Math.min(canvas.width - pad, x)),
+        y: Math.max(Math.min(minY, player.y), Math.min(maxY, y))
+    };
+}
+
 function handleStart(e) {
-    if (!gameState.active || gameState.waiting || gameState.arrows <= 0) return;
+    if (!canShoot()) { resetPull(); return; }
     e.preventDefault();
     AudioFX.init();
-    const pos = getEventPos(e);
+    const pos = clampPull(getEventPos(e).x, getEventPos(e).y);
     player.isPulling = true;
-    player.pullX = pos.x;
-    player.pullY = pos.y;
+    player.pullX = player.x;
+    player.pullY = player.y;
     player.curX = pos.x;
     player.curY = pos.y;
 }
 
 function handleMove(e) {
     if (!player.isPulling) return;
+    if (!canShoot()) { resetPull(); return; }
     e.preventDefault();
-    const pos = getEventPos(e);
+    const pos = clampPull(getEventPos(e).x, getEventPos(e).y);
     player.curX = pos.x;
     player.curY = pos.y;
 }
@@ -485,14 +545,21 @@ function handleMove(e) {
 function handleEnd(e) {
     if (!player.isPulling) return;
     player.isPulling = false;
+    if (!canShoot()) return;
+
     let dx = player.pullX - player.curX;
     let dy = player.pullY - player.curY;
     let dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > player.maxPull) dist = player.maxPull;
-    if (dist < 18) return;
+    if (dist > player.maxPull) {
+        const scale = player.maxPull / dist;
+        dx *= scale;
+        dy *= scale;
+        dist = player.maxPull;
+    }
+    if (dist < 14) return;
 
     const angle = Math.atan2(dy, dx);
-    const force = (dist / player.maxPull) * 20;
+    const force = (dist / player.maxPull) * (19 - gameState.levelIdx * 0.3);
 
     arrows.push({
         x: player.x, y: player.y,
@@ -509,12 +576,20 @@ function handleEnd(e) {
     AudioFX.play('shoot');
 }
 
+function handleCancel() {
+    resetPull();
+}
+
 canvas.addEventListener('mousedown', handleStart);
 canvas.addEventListener('mousemove', handleMove);
 canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('mouseleave', handleCancel);
 canvas.addEventListener('touchstart', handleStart, { passive: false });
 canvas.addEventListener('touchmove', handleMove, { passive: false });
 canvas.addEventListener('touchend', handleEnd);
+canvas.addEventListener('touchcancel', handleCancel);
+window.addEventListener('mouseup', handleEnd);
+window.addEventListener('touchend', handleEnd);
 
 function update() {
     if (!gameState.active || !target) return;
