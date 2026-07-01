@@ -537,7 +537,8 @@ const LAYER_GAP = 1.85;
 const TOWER_RADIUS = 2.35;
 const LAYER_HEIGHT = 0.34;
 const LAYER_TOP = LAYER_HEIGHT / 2;   // top surface offset from layer centre
-const BALL_ORBIT_R = TOWER_RADIUS * 0.81; // ball rides on the ring, not the centre beam
+const BALL_ORBIT_R = TOWER_RADIUS * 0.88; // outer rim — visible front edge
+const BALL_WORLD_ANGLE = Math.PI / 2;   // +Z = facing the camera
 const SEGMENTS_PER_LAYER = 8;
 const GAP_SEGMENTS = 2;       // how many contiguous segments are "open"
 const DANGER_CHANCE = 0.16;
@@ -753,7 +754,7 @@ document.getElementById('bestVal').textContent = best;
 let gameState = 'title'; // title | playing | gameover | starting
 let ballY = 0;
 let ballVelY = 0;
-let ballAngle = 0; // world angle of ball around axis
+let ballAngle = BALL_WORLD_ANGLE;
 let towerRotation = 0; // current rotation applied to whole tower group
 let targetRotVel = 0;
 let currentRotVel = 0;
@@ -764,8 +765,8 @@ let started = false;
 let shakeTime = 0;
 let prevBallY = -1.2;
 
-const GRAVITY = -13;
-const BOUNCE_VEL = 6.6;
+const GRAVITY = -11.5;
+const BOUNCE_VEL = 5.8;
 const BALL_RADIUS = 0.32;
 
 function clearTower(){
@@ -804,7 +805,7 @@ function resetGame(){
   ballY = -1.2;
   prevBallY = -1.2;
   ballVelY = 0;
-  ballAngle = 0; // ball sits on +X side of ring; tower rotates beneath
+  ballAngle = BALL_WORLD_ANGLE;
   towerRotation = 0;
   currentRotVel = 0;
   TOWER_GROUP.rotation.y = 0;
@@ -822,9 +823,16 @@ function updateBallWorldPos(){
 function layerSurfaceY(l){ return l.y + LAYER_TOP; }
 
 function ballCrossedLayer(prevY, currY, l){
-  const surface = layerSurfaceY(l);
-  const hitY = surface + BALL_RADIUS;
+  if(currY >= prevY) return false; // only when falling
+  const hitY = layerSurfaceY(l) + BALL_RADIUS;
   return prevY >= hitY && currY <= hitY;
+}
+
+function getLayersCrossedThisFrame(prevY, currY){
+  if(currY >= prevY) return [];
+  return layers
+    .filter(l => !l.passed && ballCrossedLayer(prevY, currY, l))
+    .sort((a, b) => b.y - a.y);
 }
 
 /* ---------------- Input (drag to rotate) ---------------- */
@@ -843,7 +851,7 @@ function onPointerMove(e){
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   const dx = x - lastX;
   lastX = x;
-  const rotDelta = dx * 0.008;
+  const rotDelta = dx * 0.0095;
   TOWER_GROUP.rotation.y += rotDelta;
   dragVelocity = rotDelta;
 }
@@ -851,9 +859,9 @@ function onPointerUp(){
   dragActive = false;
   currentRotVel = dragVelocity * 6; // momentum
 }
-canvas.addEventListener('touchstart', onPointerDown, {passive:true});
-canvas.addEventListener('touchmove', onPointerMove, {passive:true});
-canvas.addEventListener('touchend', onPointerUp, {passive:true});
+canvas.addEventListener('touchstart', onPointerDown, {passive:false});
+canvas.addEventListener('touchmove', onPointerMove, {passive:false});
+canvas.addEventListener('touchend', onPointerUp, {passive:false});
 canvas.addEventListener('mousedown', onPointerDown);
 window.addEventListener('mousemove', onPointerMove);
 window.addEventListener('mouseup', onPointerUp);
@@ -921,16 +929,13 @@ let lastTime = performance.now();
 function checkCollisionAndScore(){
   if(ballVelY >= 0){ recycleLayers(); return; }
 
-  // Sweep every layer the ball passed through this frame (fall through all gaps until a solid)
-  const crossed = layers
-    .filter(l => !l.passed && ballCrossedLayer(prevBallY, ballY, l))
-    .sort((a, b) => b.y - a.y);
+  const crossed = getLayersCrossedThisFrame(prevBallY, ballY);
 
   for(const l of crossed){
-    const isGap = l.segments.length === 0 || l.angleIsGap(ballAngle);
+    const isGap = l.segments.length === 0 || l.angleIsGap(BALL_WORLD_ANGLE);
 
     if(isGap){
-      if(l.angleIsDanger(ballAngle)){
+      if(l.angleIsDanger(BALL_WORLD_ANGLE)){
         onDeath();
         return;
       }
@@ -940,11 +945,9 @@ function checkCollisionAndScore(){
       document.getElementById('score').textContent = score;
       Audio_.pass(comboStreak);
       showCombo(comboStreak);
-      // keep falling — check next gap/stack in same frame
       continue;
     }
 
-    // Solid stack — land on top surface and bounce
     l.passed = true;
     ballY = layerSurfaceY(l) + BALL_RADIUS;
     ballVelY = BOUNCE_VEL;
@@ -975,46 +978,52 @@ function animate(now){
   beam.rotation.y += dt*0.2;
 
   if(gameState === 'playing'){
-    prevBallY = ballY;
-    ballVelY += GRAVITY * dt;
-    ballY += ballVelY * dt;
-    updateBallWorldPos();
+    // Sub-step physics when falling fast so gaps are never skipped
+    const dy = ballVelY;
+    const steps = Math.max(1, Math.ceil(Math.abs(dy * dt) / (LAYER_GAP * 0.45)));
+    const subDt = dt / steps;
 
-    // rotation momentum decay
-    if(!dragActive){
-      TOWER_GROUP.rotation.y += currentRotVel*dt*10;
-      currentRotVel *= 0.9;
+    for(let s = 0; s < steps; s++){
+      prevBallY = ballY;
+      ballVelY += GRAVITY * subDt;
+      ballY += ballVelY * subDt;
+      updateBallWorldPos();
+      checkCollisionAndScore();
+      if(gameState !== 'playing') break;
     }
 
-    checkCollisionAndScore();
+    if(!dragActive){
+      TOWER_GROUP.rotation.y += currentRotVel * dt * 10;
+      currentRotVel *= 0.92;
+    }
 
-    // trail particles
-    if(Math.random()<0.6) spawnParticle(ball.position.x + (Math.random()-0.5)*0.1, ball.position.y + (Math.random()-0.5)*0.1, ball.position.z);
+    if(Math.random() < 0.5) spawnParticle(ball.position.x + (Math.random()-0.5)*0.08, ball.position.y, ball.position.z);
 
-    // fall too far without progress = safety catch (shouldn't happen but just in case)
     if(ballY < -600) onDeath();
 
-    // camera follow
-    cameraTargetY = ball.position.y + 2.4;
+    cameraTargetY = ball.position.y + 2.2;
   }
 
-  camera.position.y += (cameraTargetY - camera.position.y) * Math.min(dt * 4, 1);
+  camera.position.y += (cameraTargetY - camera.position.y) * Math.min(dt * 5, 1);
+  camera.position.z += (10.5 - camera.position.z) * Math.min(dt * 4, 1);
+  camera.position.x += (0 - camera.position.x) * 0.15;
   // Keep lights locked to camera so brightness never fades as you descend
-  spot.position.set(0, camera.position.y + 12, 6);
-  spot.target.position.set(0, camera.position.y - 4, 0);
-  rimCyan.position.set(-6, camera.position.y, 4);
-  rimMagenta.position.set(6, camera.position.y - 2, 4);
+  spot.position.set(0, camera.position.y + 12, camera.position.z - 4);
+  spot.target.position.set(0, ball.position.y - 0.5, BALL_ORBIT_R * 0.65);
+  rimCyan.position.set(-5, camera.position.y, camera.position.z - 5);
+  rimMagenta.position.set(5, camera.position.y - 1, camera.position.z - 5);
   beam.position.y = camera.position.y - 2;
   TOWER_GROUP.position.y = 0;
   floorMesh.position.y = layers.length ? layers[layers.length-1].y - 1.2 : -30;
-  camera.lookAt(0, camera.position.y - 3.2, 0);
+  // Look at ball on front rim — ball always faces player
+  camera.lookAt(0, ball.position.y - 0.6, BALL_ORBIT_R * 0.72);
 
-  // screen shake
+  // screen shake (preserve front-facing camera z)
   if(shakeTime > 0){
     shakeTime -= dt;
-    camera.position.x = (Math.random()-0.5)*0.15*Math.max(shakeTime,0)*3;
+    camera.position.x = (Math.random()-0.5)*0.12*Math.max(shakeTime,0)*3;
   } else {
-    camera.position.x += (0-camera.position.x)*0.2;
+    camera.position.x += (0 - camera.position.x) * 0.15;
   }
 
   updateParticles(dt);
