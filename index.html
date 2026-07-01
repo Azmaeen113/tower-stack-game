@@ -177,13 +177,15 @@ const AudioFX = {
     }
 };
 
+// Ring bands: what you SEE is what you SCORE (2D flat target, no 3D depth)
 const RINGS = [
-    { ratio: 0.18, pts: 10, label: 'BULLSEYE!', color: '#ffd700', sound: 'bullseye', big: 'BULLSEYE!' },
-    { ratio: 0.38, pts: 7,  label: '+7', color: '#e74c3c', sound: 'perfect', big: 'GREAT SHOT!' },
-    { ratio: 0.58, pts: 5,  label: '+5', color: '#3498db', sound: 'hit' },
-    { ratio: 0.78, pts: 3,  label: '+3', color: '#2c3e50', sound: 'hit' },
-    { ratio: 1.00, pts: 1,  label: '+1', color: '#ecf0f1', sound: 'hit' }
+    { max: 0.34, pts: 10, label: 'BULLSEYE!', color: '#ffd700', fill: '#f1c40f', sound: 'bullseye', big: 'BULLSEYE!' },
+    { max: 0.54, pts: 7,  label: '+7', color: '#e74c3c', fill: '#e74c3c', sound: 'perfect', big: 'GREAT SHOT!' },
+    { max: 0.72, pts: 5,  label: '+5', color: '#3498db', fill: '#3498db', sound: 'hit' },
+    { max: 0.90, pts: 3,  label: '+3', color: '#34495e', fill: '#2c3e50', sound: 'hit' },
+    { max: 1.00, pts: 1,  label: '+1', color: '#ecf0f1', fill: '#ecf0f1', sound: 'hit' }
 ];
+const BULLSEYE_2D_GRACE = 0.05; // extra forgiveness so center gold always feels fair on mobile
 
 const LEVELS = [
     { goal: 20, arrows: 9, speed: 1.4, wind: 0,    radius: 58 },
@@ -314,8 +316,10 @@ function checkEndOfTurn() {
 
 function scoreFromDist(dist, r) {
     const ratio = dist / r;
+    // Hit the visible gold middle → 10 points (2D, generous center zone)
+    if (ratio <= RINGS[0].max + BULLSEYE_2D_GRACE) return RINGS[0];
     for (let i = 0; i < RINGS.length; i++) {
-        if (ratio <= RINGS[i].ratio) return RINGS[i];
+        if (ratio <= RINGS[i].max) return RINGS[i];
     }
     return null;
 }
@@ -436,7 +440,7 @@ function update() {
         const dy = a.y - target.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < target.r + 4 && a.vy < 0) {
+        if (dist < target.r + 6) {
             const ring = scoreFromDist(dist, target.r);
             if (ring) {
                 a.flying = false;
@@ -524,17 +528,24 @@ function drawTarget() {
     ctx.ellipse(0, t.r + 8, t.r * 0.9, 10, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const ringColors = ['#ecf0f1', '#2c3e50', '#3498db', '#e74c3c', '#f1c40f'];
-    for (let i = 0; i < 5; i++) {
-        const r = t.r * RINGS[4 - i].ratio;
-        ctx.fillStyle = ringColors[i];
+    for (let i = RINGS.length - 1; i >= 0; i--) {
+        ctx.fillStyle = RINGS[i].fill;
         ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.arc(0, 0, t.r * RINGS[i].max, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
     }
+
+    // Center dot — aim here for 10 pts
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
     stuckArrows.sort((a, b) => b.depth - a.depth);
     stuckArrows.forEach(sa => {
