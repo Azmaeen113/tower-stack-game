@@ -533,6 +533,23 @@ scene.add(beam);
 const TOWER_GROUP = new THREE.Group();
 scene.add(TOWER_GROUP);
 
+const TAU = Math.PI * 2;
+const _wDir = new THREE.Vector3();
+const _wMat = new THREE.Matrix4();
+const _wMatInv = new THREE.Matrix4();
+
+/** World XZ angle → layer-local angle using Three.js transforms (matches rendered meshes). */
+function worldAngleToLocal(layerGroup, worldAngle){
+  _wDir.set(Math.cos(worldAngle), 0, Math.sin(worldAngle));
+  layerGroup.updateWorldMatrix(true, false);
+  _wMat.copy(layerGroup.matrixWorld).setPosition(0, 0, 0);
+  _wMatInv.copy(_wMat).invert();
+  _wDir.applyMatrix4(_wMatInv);
+  let a = Math.atan2(_wDir.z, _wDir.x);
+  if(a < 0) a += TAU;
+  return a;
+}
+
 const LAYER_GAP = 1.85;
 const TOWER_RADIUS = 2.35;
 const LAYER_HEIGHT = 0.34;
@@ -625,11 +642,12 @@ class Layer {
   }
   // worldAngle: fixed angle in world space where the ball sits (we use 0).
   // Total rotation applied to this layer's ring = its own base rotation + the parent tower group's rotation.
+  localAngle(worldAngle){
+    return worldAngleToLocal(this.group, worldAngle);
+  }
   segmentIndexAt(worldAngle){
-    const totalRot = this.group.rotation.y + TOWER_GROUP.rotation.y;
-    let local = worldAngle - totalRot;
-    local = ((local % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    return Math.floor((local + this.segAngle * 0.03) / this.segAngle) % SEGMENTS_PER_LAYER;
+    const local = this.localAngle(worldAngle);
+    return Math.floor(local / this.segAngle) % SEGMENTS_PER_LAYER;
   }
   segmentIsGap(segIdx){
     for(let g = this.gapStart; g < this.gapEnd; g++){
@@ -637,21 +655,12 @@ class Layer {
     }
     return false;
   }
-  // True when a solid mesh arc covers the ball's world angle (matches visuals exactly)
-  isSolidAtAngle(worldAngle){
-    if(this.segments.length === 0) return false;
-    const totalRot = this.group.rotation.y + TOWER_GROUP.rotation.y;
-    let local = worldAngle - totalRot;
-    local = ((local % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    for(const sg of this.segments){
-      const start = sg.thetaStart;
-      const end = start + sg.thetaLen;
-      if(local >= start - 0.02 && local < end + 0.02) return true;
-    }
-    return false;
-  }
   angleIsGap(worldAngle){
-    return !this.isSolidAtAngle(worldAngle);
+    if(this.segments.length === 0) return true;
+    return this.segmentIsGap(this.segmentIndexAt(worldAngle));
+  }
+  isSolidAtAngle(worldAngle){
+    return !this.angleIsGap(worldAngle);
   }
   angleIsDanger(worldAngle){
     const segIdx = this.segmentIndexAt(worldAngle);
@@ -862,13 +871,8 @@ function resolveCollisions(prevY){
     const sorted = [...layers].sort((a, b) => b.y - a.y);
     for(const l of sorted){
       const surface = topHit(l);
-
-      // Already passed this layer — never bounce on it again while below
-      if(ballY < surface - 0.06) continue;
-
-      const crossed = crossedPlaneDown(prevY, ballY, surface);
-      const landing = crossed || (ballY <= surface + 0.015 && ballVelY < 0 && prevY > ballY);
-      if(!landing) continue;
+      if(ballY < surface - 0.12) continue;
+      if(!crossedPlaneDown(prevY, ballY, surface)) continue;
 
       if(layerIsGapAtBall(l)){
         if(l.angleIsDanger(BALL_WORLD_ANGLE)){ onDeath(); return; }
@@ -880,7 +884,6 @@ function resolveCollisions(prevY){
           Audio_.pass(comboStreak);
           showCombo(comboStreak);
         }
-        // Keep falling — do NOT bounce
         continue;
       }
 
