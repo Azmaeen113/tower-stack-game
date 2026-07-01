@@ -269,6 +269,7 @@ let arrows = [];
 let stuckArrows = [];
 let particles = [];
 let levelAdvanceTimer = null;
+let gameOverTimer = null;
 
 function layoutPlayer() {
     player.x = canvas.width / 2;
@@ -341,6 +342,7 @@ function canShoot() {
 
 function startGame() {
     if (levelAdvanceTimer) { clearTimeout(levelAdvanceTimer); levelAdvanceTimer = null; }
+    if (gameOverTimer) { clearTimeout(gameOverTimer); gameOverTimer = null; }
     gameState = { active: true, levelIdx: 0, levelScore: 0, totalScore: 0, arrows: LEVELS[0].arrows, windX: 0, windY: 0, waiting: false };
     arrows = [];
     stuckArrows = [];
@@ -364,6 +366,7 @@ function tryLevelComplete() {
 }
 
 function nextLevel() {
+    if (gameOverTimer) { clearTimeout(gameOverTimer); gameOverTimer = null; }
     gameState.levelIdx++;
     if (gameState.levelIdx >= LEVELS.length) {
         gameState.active = false;
@@ -413,7 +416,13 @@ function checkEndOfTurn() {
         return;
     }
     if (gameState.arrows <= 0) {
-        setTimeout(gameOver, 600);
+        if (gameOverTimer) return;
+        gameOverTimer = setTimeout(() => {
+            gameOverTimer = null;
+            if (gameState.waiting || gameState.levelScore >= getLevel().goal) return;
+            if (gameState.arrows > 0 || arrows.length > 0) return;
+            gameOver();
+        }, 600);
     }
 }
 
@@ -454,9 +463,7 @@ function registerArrowHit(stickX, stickY, stickAngle, dist) {
     updateHUD();
     if (gameState.levelScore >= getLevel().goal) {
         tryLevelComplete();
-        return;
     }
-    checkEndOfTurn();
 }
 
 function drawArrowGraphic(len, thick) {
@@ -652,6 +659,7 @@ function update() {
             if (leftTarget || settled || timedOut) {
                 registerArrowHit(a.stickX, a.stickY, a.stickAngle, a.bestDist);
                 arrows.splice(i, 1);
+                checkEndOfTurn();
             }
         }
     }
