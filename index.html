@@ -94,11 +94,13 @@
   #titleScreen{
     position:absolute;inset:0;z-index:30;
     display:flex;flex-direction:column;align-items:center;
-    justify-content:center;
-    padding:calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+    justify-content:flex-start;
+    padding:calc(16px + env(safe-area-inset-top)) 24px 0;
+    pointer-events:none;
     transition:opacity .5s ease, transform .5s ease;
   }
   #titleScreen.hidden{opacity:0;transform:scale(1.05);pointer-events:none;}
+  .titleSpacer{flex:1;min-height:12px;}
 
   .logo{
     text-align:center;
@@ -136,7 +138,7 @@
 
   #playBtn{
     pointer-events:all;
-    margin-top:48px;
+    margin-bottom:calc(28px + env(safe-area-inset-bottom));
     width:118px;height:118px;border-radius:50%;
     background:
       radial-gradient(circle at 35% 30%, #ff9a4d, var(--orange) 45%, #c94f00 100%);
@@ -294,6 +296,7 @@
       <span class="l1">SPIRAL</span>
       <span class="l2">DROP</span>
     </div>
+    <div class="titleSpacer"></div>
     <button id="playBtn" aria-label="Play">
       <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
     </button>
@@ -517,6 +520,8 @@ const RING_INNER = TOWER_RADIUS * 0.62;
 const RING_OUTER = TOWER_RADIUS;
 const BALL_ORBIT_R = RING_OUTER - BALL_RADIUS * 0.45; // outer rim — clearly on the platform
 const BALL_WORLD_ANGLE = Math.PI / 2; // +Z = front of screen, x=0 keeps tower centred
+const TITLE_SCENE_LIFT = 3.6; // raise tower + ball on splash
+const TITLE_CAM_OFFSET = 0.95;
 const SEGMENTS_PER_LAYER = 8;
 const GAP_SEGMENTS = 2;       // how many contiguous segments are "open"
 const DANGER_CHANCE = 0.16;
@@ -982,7 +987,6 @@ function animate(now){
   const dt = Math.min((now-lastTime)/1000, 0.033);
   lastTime = now;
 
-  beam.material.opacity = 0.18 + Math.sin(now*0.003)*0.06;
   beam.rotation.y += dt*0.2;
 
   if(gameState === 'playing'){
@@ -1012,6 +1016,17 @@ function animate(now){
     if(ballY < -600) onDeath();
 
     cameraTargetY = ball.position.y + 2.2;
+    TOWER_GROUP.position.y = 0;
+  } else if(gameState === 'title'){
+    const lift = TITLE_SCENE_LIFT;
+    TOWER_GROUP.position.y = lift;
+    const surface = layers[0].y + LAYER_TOP + BALL_RADIUS + lift;
+    ballY = surface + 0.12;
+    ballVelY = 0;
+    updateBallWorldPos();
+    cameraTargetY = ballY + TITLE_CAM_OFFSET;
+  } else {
+    TOWER_GROUP.position.y = 0;
   }
 
   camera.position.y += (cameraTargetY - camera.position.y) * Math.min(dt * 5, 1);
@@ -1024,9 +1039,8 @@ function animate(now){
   rimCyan.position.set(-5, camera.position.y, camera.position.z - 5);
   rimMagenta.position.set(5, camera.position.y - 1, camera.position.z - 5);
   beam.position.y = camera.position.y - 2;
-  beam.material.opacity = 0.22;
-  TOWER_GROUP.position.y = 0;
-  floorMesh.position.y = layers.length ? layers[layers.length-1].y - 1.2 : -30;
+  beam.material.opacity = gameState === 'title' ? 0.18 + Math.sin(now*0.003)*0.06 : 0.22;
+  floorMesh.position.y = layers.length ? layers[layers.length-1].y - 1.2 + (gameState === 'title' ? TITLE_SCENE_LIFT : 0) : -30;
   camera.lookAt(0, lookY, 0);
 
   if(shakeTime > 0){
