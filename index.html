@@ -14,17 +14,60 @@
             background: linear-gradient(180deg, #87CEEB 0%, #5a9e6f 38%, #3d6b3a 55%, #2d4a28 100%);
         }
         canvas { display: block; width: 100%; height: 100%; }
-        .ui-layer {
-            position: absolute; inset: 0; pointer-events: none;
-            display: flex; flex-direction: column; justify-content: space-between; padding: 14px;
+        .top-hud {
+            position: absolute; top: 0; left: 0; right: 0; z-index: 8;
+            padding: 10px 12px 12px;
+            background: linear-gradient(180deg, rgba(20,12,6,0.92) 0%, rgba(20,12,6,0.55) 80%, transparent 100%);
+            pointer-events: none;
         }
-        .hud { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
-        .hud-item {
-            background: rgba(0,0,0,0.55); padding: 8px 14px; border-radius: 10px;
-            color: #fff; font-weight: 700; font-size: 0.85rem;
-            border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(6px);
+        .hud-title {
+            text-align: center; font-size: 0.65rem; letter-spacing: 4px;
+            color: rgba(241,196,15,0.75); font-weight: 800; margin-bottom: 8px;
+            text-transform: uppercase;
         }
-        .hud-item span { color: var(--gold); }
+        .hud-row {
+            display: flex; align-items: stretch; gap: 8px; justify-content: center;
+        }
+        .stat-pill {
+            background: linear-gradient(145deg, rgba(60,40,20,0.9), rgba(30,20,10,0.95));
+            border: 1.5px solid rgba(241,196,15,0.45);
+            border-radius: 12px; padding: 8px 14px; min-width: 72px;
+            text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .stat-pill.arrows { border-color: rgba(192,57,43,0.55); }
+        .stat-label {
+            display: block; font-size: 0.6rem; letter-spacing: 2px;
+            color: rgba(255,255,255,0.45); font-weight: 700; margin-bottom: 2px;
+        }
+        .stat-value {
+            display: block; font-size: 1.35rem; font-weight: 900;
+            color: #f1c40f; text-shadow: 0 0 12px rgba(241,196,15,0.35);
+        }
+        .stat-pill.arrows .stat-value { color: #e74c3c; text-shadow: 0 0 10px rgba(231,76,60,0.35); }
+        .stat-progress {
+            flex: 1; max-width: 200px;
+            background: linear-gradient(145deg, rgba(60,40,20,0.9), rgba(30,20,10,0.95));
+            border: 1.5px solid rgba(241,196,15,0.35);
+            border-radius: 12px; padding: 8px 12px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .progress-head {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.6rem; letter-spacing: 1.5px; color: rgba(255,255,255,0.5);
+            font-weight: 700; margin-bottom: 6px;
+        }
+        .progress-head .nums { color: #f1c40f; font-size: 0.85rem; font-weight: 900; }
+        .progress-track {
+            height: 8px; border-radius: 6px;
+            background: rgba(0,0,0,0.45); overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .progress-fill {
+            height: 100%; width: 0%; border-radius: 6px;
+            background: linear-gradient(90deg, #c0392b, #f1c40f);
+            box-shadow: 0 0 10px rgba(241,196,15,0.5);
+            transition: width 0.35s ease;
+        }
         .screen {
             position: absolute; inset: 0; background: rgba(10,8,5,0.92);
             display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -67,24 +110,33 @@
             70% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
             100% { transform: translate(-50%, -60%) scale(0.9); opacity: 0; }
         }
-        .level-bar {
-            position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.5); padding: 6px 16px; border-radius: 20px;
-            color: #fff; font-size: 0.75rem; letter-spacing: 1px; z-index: 8;
-        }
     </style>
 </head>
 <body>
 <div id="game-container">
     <canvas id="gameCanvas"></canvas>
-    <div class="ui-layer">
-        <div class="hud">
-            <div class="hud-item">Level <span id="levelVal">1</span></div>
-            <div class="hud-item">Score <span id="scoreVal">0</span>/<span id="goalVal">20</span></div>
-            <div class="hud-item">Arrows <span id="arrowsVal">9</span></div>
+    <div class="top-hud">
+        <div class="hud-title">Apex Archer</div>
+        <div class="hud-row">
+            <div class="stat-pill">
+                <span class="stat-label">LEVEL</span>
+                <span class="stat-value" id="levelVal">1</span>
+            </div>
+            <div class="stat-progress">
+                <div class="progress-head">
+                    <span>SCORE</span>
+                    <span class="nums"><span id="scoreVal">0</span> / <span id="goalVal">20</span></span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" id="scoreProgress"></div>
+                </div>
+            </div>
+            <div class="stat-pill arrows">
+                <span class="stat-label">ARROWS</span>
+                <span class="stat-value" id="arrowsVal">9</span>
+            </div>
         </div>
     </div>
-    <div class="level-bar" id="levelBar">Level 1 · Reach 20 pts · 9 arrows</div>
 
     <div id="startScreen" class="screen active">
         <h1>Apex Archer</h1>
@@ -226,8 +278,8 @@ function updateHUD() {
     document.getElementById('scoreVal').textContent = gameState.levelScore;
     document.getElementById('goalVal').textContent = lv.goal;
     document.getElementById('arrowsVal').textContent = gameState.arrows;
-    document.getElementById('levelBar').textContent =
-        'Level ' + (gameState.levelIdx + 1) + ' · Reach ' + lv.goal + ' pts · ' + gameState.arrows + ' arrows left';
+    const pct = Math.min(100, (gameState.levelScore / lv.goal) * 100);
+    document.getElementById('scoreProgress').style.width = pct + '%';
 }
 
 function hideScreens() {
