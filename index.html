@@ -3,20 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ChromaShift: Dust Settle</title>
-    <!-- Optional: place colourpickerbackground.webp in the same folder for a custom animated backdrop -->
-    <link rel="preload" as="image" href="colourpickerbackground.webp">
+    <title>Tile Merge - Ultimate Edition</title>
+    <link rel="preload" as="image" href="mergenumbersbackground.webp">
     <style>
         :root {
-            --bg-color: #07080f;
-            --panel-bg: rgba(18, 20, 36, 0.82);
-            --panel-border: rgba(255, 255, 255, 0.12);
-            --text-color: #f0f3f8;
-            --accent-pink: #ff0055;
-            --accent-cyan: #00ffcc;
-            --accent-gold: #ffd700;
-            --glow-pink: rgba(255, 0, 85, 0.45);
-            --glow-cyan: rgba(0, 255, 204, 0.35);
+            --bg-color: #0f111a;
+            --grid-bg: #1e2235;
+            --text-main: #ffffff;
+            --accent: #ff4757;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         * {
@@ -25,789 +20,968 @@
             -webkit-user-select: none;
             margin: 0;
             padding: 0;
-            touch-action: manipulation;
+            touch-action: none;
         }
 
-        body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: var(--bg-color);
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            color: var(--text-color);
-        }
-
-        #game-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            overflow: hidden;
-            background-color: #07080f;
-            background-image: url('colourpickerbackground.webp');
+        body {
+            background-color: #0f111a;
+            background-image: url('mergenumbersbackground.webp');
             background-size: cover;
             background-position: center center;
             background-repeat: no-repeat;
+            color: var(--text-main);
+            font-family: var(--font-family);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
-        #game-container::before {
+        body::before {
             content: '';
-            position: absolute;
+            position: fixed;
             inset: 0;
-            background: linear-gradient(180deg,
-                rgba(7, 8, 15, 0.55) 0%,
-                rgba(7, 8, 15, 0.25) 35%,
-                rgba(7, 8, 15, 0.65) 70%,
-                rgba(7, 8, 15, 0.92) 100%);
-            z-index: 2;
+            background: linear-gradient(180deg, rgba(15,17,26,0.5) 0%, rgba(15,17,26,0.35) 40%, rgba(15,17,26,0.75) 100%);
             pointer-events: none;
+            z-index: 0;
         }
 
-        canvas {
+        /* Canvas Particle Layer */
+        #fxCanvas {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1;
-            opacity: 0.65;
+            pointer-events: none;
+            z-index: 10;
         }
 
-        .ui-layer {
-            position: relative;
-            z-index: 10;
+        /* Screen Wrapper */
+        #game-container {
             width: 100%;
+            max-width: 440px;
+            height: 100%;
+            max-height: 900px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            position: relative;
+            z-index: 5;
+        }
+
+        /* Header UI */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .brand-title {
+            font-size: 28px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: linear-gradient(45deg, #ff4757, #ff6b81, #ffa502);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
+        }
+
+        .score-box {
+            background: rgba(255, 255, 255, 0.07);
+            padding: 8px 16px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .score-box p {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: #a4b0be;
+            letter-spacing: 1px;
+        }
+
+        .score-box span {
+            font-size: 20px;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Progressive Status Panel */
+        #status-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .panel-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .panel-row:last-child { margin-bottom: 0; }
+
+        .target-node {
+            font-size: 14px;
+            font-weight: 600;
+            color: #ffa502;
+        }
+
+        .level-node {
+            font-weight: bold;
+            background: #2ed573;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        /* Speed/Time Progress Bar */
+        .progress-bar-container {
+            width: 100%;
+            height: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        #progress-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #2ed573, #ff4757);
+            transition: width 0.1s linear;
+        }
+
+        /* The Grid Board */
+        #grid-container {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: rgba(20, 24, 40, 0.88);
+            border-radius: 24px;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 12px;
+            position: relative;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.5), inset 0 2px 8px rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            touch-action: none;
+            cursor: grab;
+        }
+
+        #grid-container:active { cursor: grabbing; }
+
+        .grid-cell {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Tile Elements */
+        .tile {
+            position: absolute;
+            border-radius: 14px;
+            font-weight: 900;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35), inset 0 2px 6px rgba(255,255,255,0.25);
+            font-size: 28px;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.45);
+            will-change: transform;
+            border: 2px solid rgba(255,255,255,0.18);
             pointer-events: none;
         }
 
-        /* ── Top HUD ── */
-        header {
-            padding: 14px 16px;
+        .tile-scale-up {
+            animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .tile-merge-anim {
+            animation: mergeBurst 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0) rotate(-8deg); opacity: 0; }
+            70% { transform: scale(1.08) rotate(2deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        @keyframes mergeBurst {
+            0% { transform: scale(1); filter: brightness(1); }
+            35% { transform: scale(1.22); filter: brightness(1.6); box-shadow: 0 0 30px currentColor; }
+            100% { transform: scale(1); filter: brightness(1); }
+        }
+
+        .tile-2    { background: linear-gradient(145deg, #636e72, #2d3436); font-size: 32px; color: #dfe6e9; }
+        .tile-4    { background: linear-gradient(145deg, #74b9ff, #0984e3); font-size: 32px; box-shadow: 0 0 12px rgba(9,132,227,0.4); }
+        .tile-8    { background: linear-gradient(145deg, #55efc4, #00b894); font-size: 32px; box-shadow: 0 0 14px rgba(0,184,148,0.45); }
+        .tile-16   { background: linear-gradient(145deg, #ffeaa7, #fdcb6e); font-size: 28px; color: #2d3436; box-shadow: 0 0 16px rgba(253,203,110,0.5); }
+        .tile-32   { background: linear-gradient(145deg, #fab1a0, #e17055); font-size: 28px; box-shadow: 0 0 18px rgba(225,112,85,0.5); }
+        .tile-64   { background: linear-gradient(145deg, #ff7675, #d63031); font-size: 28px; box-shadow: 0 0 20px rgba(214,48,49,0.55); }
+        .tile-128  { background: linear-gradient(145deg, #fd79a8, #e84393); font-size: 24px; box-shadow: 0 0 22px rgba(232,67,147,0.6); }
+        .tile-256  { background: linear-gradient(145deg, #a29bfe, #6c5ce7); font-size: 24px; box-shadow: 0 0 24px rgba(108,92,231,0.65); }
+        .tile-512  { background: linear-gradient(145deg, #81ecec, #00cec9); font-size: 24px; box-shadow: 0 0 26px rgba(0,206,201,0.7); }
+        .tile-1024 { background: linear-gradient(145deg, #ffeaa7, #f39c12); font-size: 20px; color: #2d3436; box-shadow: 0 0 28px rgba(243,156,18,0.75); }
+        .tile-2048 { background: linear-gradient(145deg, #fff200, #f1c40f); font-size: 20px; color: #2d3436; box-shadow: 0 0 32px rgba(241,196,15,0.85); animation: goldPulse 1.5s ease-in-out infinite; }
+
+        @keyframes goldPulse {
+            0%, 100% { box-shadow: 0 0 28px rgba(241,196,15,0.75); }
+            50% { box-shadow: 0 0 42px rgba(241,196,15,1); }
+        }
+
+        /* Control Footer Options */
+        footer {
             display: flex;
-            justify-content: center;
-            align-items: stretch;
-            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
             width: 100%;
+            margin-top: 10px;
         }
 
-        .hud-brand {
-            text-align: center;
-            margin-bottom: 2px;
-            font-size: 0.62rem;
-            letter-spacing: 5px;
-            font-weight: 800;
-            color: rgba(0, 255, 204, 0.7);
-            text-transform: uppercase;
-        }
-
-        .stat-box {
-            flex: 1;
-            max-width: 160px;
-            background: var(--panel-bg);
-            padding: 10px 14px;
+        .btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+            padding: 12px 24px;
             border-radius: 14px;
-            border: 1px solid var(--panel-border);
-            backdrop-filter: blur(14px);
-            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: rgba(255,255,255,0.15);
+        }
+
+        /* Screens Layer Overlay */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 17, 26, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
             text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
         }
 
-        .stat-label {
-            display: block;
-            font-size: 0.58rem;
-            letter-spacing: 2.5px;
-            color: rgba(255, 255, 255, 0.45);
-            font-weight: 700;
-            margin-bottom: 2px;
+        .overlay.active {
+            opacity: 1;
+            pointer-events: auto;
         }
 
-        .stat-value {
-            display: block;
-            font-size: 1.35rem;
+        .overlay h1 {
+            font-size: 40px;
+            margin-bottom: 10px;
             font-weight: 900;
             letter-spacing: 1px;
         }
 
-        #score-display .stat-value { color: var(--accent-cyan); text-shadow: 0 0 14px var(--glow-cyan); }
-        #level-display .stat-value { color: var(--accent-gold); text-shadow: 0 0 12px rgba(255, 215, 0, 0.35); }
-
-        /* ── Central target zone ── */
-        #target-container {
-            position: absolute;
-            top: 28%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 5;
-            text-align: center;
-            pointer-events: none;
-            width: min(92%, 520px);
+        .overlay p {
+            color: #a4b0be;
+            margin-bottom: 30px;
+            font-size: 16px;
+            line-height: 1.5;
         }
 
-        .target-card {
-            background: var(--panel-bg);
-            border: 1px solid var(--panel-border);
-            border-radius: 24px;
-            padding: 28px 24px 22px;
-            backdrop-filter: blur(16px);
-            box-shadow:
-                0 20px 50px rgba(0, 0, 0, 0.45),
-                inset 0 1px 0 rgba(255, 255, 255, 0.08),
-                0 0 40px rgba(255, 0, 85, 0.08);
-        }
-
-        .target-hint {
-            font-size: 0.72rem;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.5);
-            font-weight: 700;
-            margin-bottom: 14px;
-        }
-
-        .target-hint b {
-            color: var(--accent-cyan);
-            font-weight: 900;
-        }
-
-        /* Question color block — the visual puzzle */
-        .question-block-wrap {
-            margin: 0 auto;
-            max-width: 280px;
-        }
-
-        .question-color-block {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 1.35;
-            border-radius: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            box-shadow:
-                0 16px 40px rgba(0, 0, 0, 0.5),
-                inset 0 4px 16px rgba(255, 255, 255, 0.2),
-                inset 0 -6px 20px rgba(0, 0, 0, 0.35);
-            overflow: hidden;
+        .start-tile-preview {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.12s ease, box-shadow 0.2s ease;
-        }
-
-        .question-color-block::before {
-            content: '';
-            position: absolute;
-            top: 6%;
-            left: 8%;
-            width: 40%;
-            height: 18%;
-            background: rgba(255, 255, 255, 0.28);
-            border-radius: 50%;
-            filter: blur(4px);
-            pointer-events: none;
-        }
-
-        .question-color-block::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 45%, rgba(0,0,0,0.15) 100%);
-            pointer-events: none;
-        }
-
-        #illusion-word {
-            position: relative;
-            z-index: 2;
-            font-size: clamp(2rem, 9vw, 3.4rem);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            color: #fff;
-            text-shadow:
-                0 3px 0 rgba(0, 0, 0, 0.55),
-                0 6px 20px rgba(0, 0, 0, 0.7),
-                0 0 30px rgba(0, 0, 0, 0.5);
-            transition: transform 0.12s ease;
-            display: inline-block;
-            line-height: 1.1;
-            padding: 0 8px;
-        }
-
-        #timer-container {
-            width: 100%;
-            height: 10px;
-            background: rgba(0, 0, 0, 0.45);
-            border-radius: 8px;
-            margin-top: 18px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        #timer-bar {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent-pink), var(--accent-gold), var(--accent-cyan));
-            box-shadow: 0 0 12px var(--glow-pink);
-            transition: width 0.05s linear;
-        }
-
-        /* ── Text-only answer panel ── */
-        #choice-panel {
-            width: 100%;
-            padding: 16px 16px 22px;
-            background: linear-gradient(to top, rgba(7, 8, 15, 0.97), rgba(7, 8, 15, 0.55));
-            backdrop-filter: blur(10px);
-            pointer-events: auto;
-            max-height: 48%;
-            overflow-y: auto;
-            z-index: 10;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-        }
-
-        .panel-label {
-            text-align: center;
-            font-size: 0.65rem;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.4);
-            font-weight: 800;
-            margin-bottom: 12px;
-        }
-
-        #options-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
             gap: 10px;
-            max-width: 720px;
-            margin: 0 auto;
+            margin-bottom: 35px;
         }
 
-        .name-btn {
-            background: linear-gradient(145deg, rgba(40, 42, 62, 0.95), rgba(22, 24, 38, 0.98));
-            border: 2px solid rgba(255, 255, 255, 0.14);
-            border-radius: 14px;
-            padding: 16px 10px;
-            cursor: pointer;
-            transition: transform 0.12s ease, border-color 0.15s, box-shadow 0.15s, background 0.15s;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-            font-size: 0.92rem;
-            font-weight: 800;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.92);
-            text-align: center;
-        }
-
-        .name-btn:active {
-            transform: scale(0.94);
-        }
-
-        .name-btn:hover {
-            border-color: rgba(0, 255, 204, 0.35);
-            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 14px rgba(0, 255, 204, 0.12);
-        }
-
-        /* ── Screens ── */
-        .screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(7, 8, 15, 0.92);
-            z-index: 100;
+        .preview-box {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            justify-content: center;
-            padding: 30px;
-            text-align: center;
-            backdrop-filter: blur(18px);
+            font-weight: bold;
+            font-size: 20px;
         }
 
-        .hidden {
-            opacity: 0;
-            pointer-events: none;
-            display: none !important;
-        }
-
-        h1 {
-            font-size: clamp(2.2rem, 9vw, 3.6rem);
-            font-weight: 900;
-            background: linear-gradient(135deg, #ff0055, #bc00dd, #00ffcc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 8px;
-            letter-spacing: 3px;
-        }
-
-        .edition-tag {
-            color: var(--accent-cyan);
-            font-weight: 800;
-            font-size: 0.75rem;
-            letter-spacing: 4px;
-            margin-bottom: 18px;
-        }
-
-        .subtitle {
-            color: #8a92b2;
-            margin-bottom: 32px;
-            font-size: 1rem;
-            max-width: 400px;
-            line-height: 1.65;
-        }
-
-        .demo-blocks {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 28px;
-            justify-content: center;
-        }
-
-        .demo-block {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-        }
-
-        .action-btn {
-            background: linear-gradient(135deg, #ff0055, #bc00dd);
+        #mute-btn {
+            background: transparent;
             border: none;
-            color: white;
-            padding: 16px 42px;
-            font-size: 1.1rem;
-            font-weight: 800;
-            border-radius: 50px;
+            font-size: 24px;
             cursor: pointer;
-            box-shadow: 0 8px 28px var(--glow-pink);
-            transition: transform 0.2s, box-shadow 0.2s;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            pointer-events: auto;
-        }
-
-        .action-btn:active {
-            transform: scale(0.96);
-        }
-
-        /* Juice effects */
-        .flash-red { animation: redAlert 0.4s ease-out; }
-        @keyframes redAlert {
-            0% { box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.5); }
-            100% { box-shadow: inset 0 0 0 transparent; }
-        }
-
-        .flash-green { animation: greenPass 0.3s ease-out; }
-        @keyframes greenPass {
-            0% { box-shadow: inset 0 0 60px rgba(0, 255, 200, 0.25); }
-            100% { box-shadow: inset 0 0 0 transparent; }
-        }
-
-        .shake { animation: shakeAnim 0.3s linear; }
-        @keyframes shakeAnim {
-            0%, 100% { transform: translate(-50%, -50%) scale(1); }
-            20%, 60% { transform: translate(-53%, -48%) scale(1.04); }
-            40%, 80% { transform: translate(-47%, -52%) scale(1.04); }
-        }
-
-        .correct-pop { animation: correctPop 0.25s ease-out; }
-        @keyframes correctPop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
-
-        @media (max-width: 600px) {
-            #options-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-            .target-card { padding: 20px 16px 18px; border-radius: 20px; }
-            .name-btn { padding: 14px 8px; font-size: 0.82rem; }
-            .question-block-wrap { max-width: 240px; }
-        }
-
-        @media (max-width: 380px) {
-            #options-grid { grid-template-columns: repeat(3, 1fr); }
         }
     </style>
 </head>
 <body>
 
+    <canvas id="fxCanvas"></canvas>
+
     <div id="game-container">
-        <canvas id="gameCanvas"></canvas>
+        <header>
+            <h1 class="brand-title">Tile Merge</h1>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button id="mute-btn" title="Toggle Sound">🔊</button>
+                <div class="score-box">
+                    <p>Score</p>
+                    <span id="score-val">0</span>
+                </div>
+            </div>
+        </header>
 
-        <div class="ui-layer">
-            <div class="hud-brand">ChromaShift</div>
-            <header>
-                <div class="stat-box" id="score-display">
-                    <span class="stat-label">Score</span>
-                    <span class="stat-value">0</span>
-                </div>
-                <div class="stat-box" id="level-display">
-                    <span class="stat-label">Level</span>
-                    <span class="stat-value">1</span>
-                </div>
-            </header>
-        </div>
-
-        <div id="target-container">
-            <div class="target-card">
-                <div class="target-hint">What <b>color</b> is the block? — ignore the word</div>
-                <div class="question-block-wrap">
-                    <div class="question-color-block" id="question-color-block">
-                        <div id="illusion-word">READY?</div>
-                    </div>
-                </div>
-                <div id="timer-container">
-                    <div id="timer-bar"></div>
-                </div>
+        <div id="status-panel">
+            <div class="panel-row">
+                <span class="level-node" id="level-val">LEVEL 1</span>
+                <span class="target-node" id="target-val">HIT TARGET: 16</span>
+            </div>
+            <div class="panel-row" style="margin-top: 8px;">
+                <span style="font-size: 11px; color:#a4b0be;">Target Time window:</span>
+            </div>
+            <div class="progress-bar-container">
+                <div id="progress-fill"></div>
             </div>
         </div>
 
-        <div id="choice-panel" class="ui-layer">
-            <div class="panel-label">Pick the color name</div>
-            <div id="options-grid"></div>
+        <div id="grid-container">
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+            <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
         </div>
 
-        <div id="start-screen" class="screen">
-            <h1>CHROMASHIFT</h1>
-            <p class="edition-tag">[ DUST SETTLE EDITION ]</p>
-            <div class="demo-blocks">
-                <div class="demo-block" style="background:#ff3333"></div>
-                <div class="demo-block" style="background:#3388ff"></div>
-                <div class="demo-block" style="background:#22dd66"></div>
-                <div class="demo-block" style="background:#ffee11"></div>
-                <div class="demo-block" style="background:#b533ff"></div>
-            </div>
-            <p class="subtitle">A Stroop-style reflex test. The block shows one color but the word says another — tap the <b>color name</b> that matches the block, not the word!</p>
-            <button class="action-btn" id="start-btn">Play</button>
+        <footer>
+            <button class="btn" id="restart-action">RESET</button>
+            <span style="font-size: 12px; color: #747d8c; font-weight: 500;">Swipe to merge tiles</span>
+        </footer>
+    </div>
+
+    <div id="menu-overlay" class="overlay active">
+        <h1 style="background: linear-gradient(45deg, #ff4757, #ffa502); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">TILE MERGE</h1>
+        <p>Swipe matching tiles to double values. Keep hitting dynamic merge targets before the speed gauge runs dry to clear escalating waves!</p>
+        
+        <div class="start-tile-preview">
+            <div class="preview-box tile-4" style="transform: rotate(-10deg);">4</div>
+            <div class="preview-box tile-16" style="transform: scale(1.1); z-index: 2;">16</div>
+            <div class="preview-box tile-64" style="transform: rotate(10deg);">64</div>
         </div>
 
-        <div id="game-over-screen" class="screen hidden">
-            <h1 style="background: linear-gradient(45deg, #ff3333, #ff0055); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">SYSTEM CRASH</h1>
-            <p class="subtitle" id="final-stats">You dissolved into the color void.</p>
-            <button class="action-btn" id="restart-btn" style="background: linear-gradient(135deg, #00ffcc, #0088cc); box-shadow: 0 8px 25px rgba(0, 255, 204, 0.3);">Try Again</button>
+        <button class="btn" id="start-action" style="padding: 16px 40px; font-size: 18px; border-color: #ff4757; background: rgba(255,47,87,0.15)">START PLAYING</button>
+    </div>
+
+    <div id="gameover-overlay" class="overlay">
+        <h1 style="color: #ff4757;">GRID LOCKED</h1>
+        <p id="gameover-reason">Time ran out or no valid moves left!</p>
+        <div class="score-box" style="margin-bottom: 30px; display:inline-block;">
+            <p>Final Score</p>
+            <span id="final-score-val" style="font-size: 32px; color:#2ed573;">0</span>
         </div>
+        <button class="btn" id="retry-action" style="padding: 14px 36px; font-size: 16px;">TRY AGAIN</button>
     </div>
 
     <script>
-        const AudioEngine = {
-            ctx: null,
-            init() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-            },
-            playLaser(isCorrect) {
-                if (!this.ctx) this.init();
-                if (this.ctx.state === 'suspended') this.ctx.resume();
-
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                const now = this.ctx.currentTime;
-
-                if (isCorrect) {
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(300, now);
-                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-                    gain.gain.setValueAtTime(0.15, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
-                    osc.start(now);
-                    osc.stop(now + 0.15);
-                } else {
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(180, now);
-                    osc.frequency.linearRampToValueAtTime(40, now + 0.3);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
-                    osc.start(now);
-                    osc.stop(now + 0.3);
-                }
-            },
-            playLevelUp() {
-                if (!this.ctx) this.init();
-                const now = this.ctx.currentTime;
-                [440, 554, 659, 880].forEach((f, i) => {
-                    const osc = this.ctx.createOscillator();
-                    const gain = this.ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(f, now + i * 0.08);
-                    osc.connect(gain);
-                    gain.connect(this.ctx.destination);
-                    gain.gain.setValueAtTime(0.1, now + i * 0.08);
-                    gain.gain.linearRampToValueAtTime(0.01, now + i * 0.08 + 0.2);
-                    osc.start(now + i * 0.08);
-                    osc.stop(now + i * 0.08 + 0.2);
-                });
-            }
+        /**
+         * PROFESSIONAL GAME CORE ENGINE OBJECTS
+         */
+        const CONFIG = {
+            size: 4,
+            baseTime: 40000, // Ms allowed per level
+            timeReductionPerLevel: 3500, // progressively faster
+            minTimeLimit: 12000
         };
 
-        const ALL_COLORS = [
-            { name: 'Red', hex: '#ff3333' },
-            { name: 'Blue', hex: '#3388ff' },
-            { name: 'Green', hex: '#22dd66' },
-            { name: 'Yellow', hex: '#ffee11' },
-            { name: 'Purple', hex: '#b533ff' },
-            { name: 'Orange', hex: '#ff9900' },
-            { name: 'Pink', hex: '#ff66cc' },
-            { name: 'Cyan', hex: '#00f5ff' },
-            { name: 'White', hex: '#ffffff' },
-            { name: 'Lime', hex: '#a6ff00' },
-            { name: 'Lavender', hex: '#cca3ff' },
-            { name: 'Brown', hex: '#996633' },
-            { name: 'Mint', hex: '#b3ffd9' },
-            { name: 'Crimson', hex: '#990033' },
-            { name: 'Gold', hex: '#ffd700' }
-        ];
-
-        let state = {
+        let gameState = {
+            grid: [],
             score: 0,
             level: 1,
-            timeRemaining: 100,
-            currentTrueColor: null,
-            activeColorsList: [],
-            isGameActive: false
+            currentTarget: 16,
+            timeLeft: 0,
+            maxTime: 40000,
+            isGameOver: false,
+            soundMuted: false
         };
 
-        const canvas = document.getElementById('gameCanvas');
+        let tilesTrack = [];
+        let timerInterval = null;
+        let pendingMergeFX = [];
+        let pointerActive = false;
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        const SWIPE_THRESHOLD = 38;
+
+        const TILE_COLORS = {
+            2: '#636e72', 4: '#0984e3', 8: '#00b894', 16: '#fdcb6e',
+            32: '#e17055', 64: '#d63031', 128: '#e84393', 256: '#6c5ce7',
+            512: '#00cec9', 1024: '#f39c12', 2048: '#f1c40f'
+        };
+
+        function getTileColor(val) {
+            return TILE_COLORS[val] || '#ffffff';
+        }
+
+        // UI Element Selectors
+        const gridContainer = document.getElementById('grid-container');
+        const scoreVal = document.getElementById('score-val');
+        const levelVal = document.getElementById('level-val');
+        const targetVal = document.getElementById('target-val');
+        const progressFill = document.getElementById('progress-fill');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const finalScoreVal = document.getElementById('final-score-val');
+        const gameoverReason = document.getElementById('gameover-reason');
+
+        // FX Canvas Setup
+        const canvas = document.getElementById('fxCanvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
-        let gridPlanes = [];
 
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            init25DGrid();
         }
         window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
 
-        class Particle {
-            constructor() {
-                this.reset();
-                this.y = Math.random() * canvas.height;
+        /**
+         * AUDIO SYNTHESIZER ENGINE (Web Audio API Framework)
+         */
+        const AudioEngine = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            play(type) {
+                if (gameState.soundMuted) return;
+                this.init();
+                
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+
+                if (type === 'spawn') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(440, now + 0.1);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'merge') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(392, now);
+                    osc.frequency.setValueAtTime(587, now + 0.05);
+                    osc.frequency.setValueAtTime(784, now + 0.1);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'target') {
+                    // Win chime
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); // C6
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'gameover') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.6);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                }
             }
-            reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = -20;
-                this.z = Math.random() * 2 + 0.2;
-                this.speedY = (Math.random() * 1.5 + 0.5) * this.z;
-                this.speedX = Math.sin(Math.random() * Math.PI) * 0.3;
-                this.size = Math.random() * 2 + 1;
-                this.color = ALL_COLORS[Math.floor(Math.random() * ALL_COLORS.length)].hex;
-                this.alpha = Math.random() * 0.35 + 0.15;
+        };
+
+        /**
+         * DYNAMIC VISUAL PARTICLE SYSTEM
+         */
+        class Particle {
+            constructor(x, y, color, type) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.type = type || 'dot';
+                this.size = Math.random() * 6 + 4;
+                this.speedX = (Math.random() - 0.5) * 12;
+                this.speedY = (Math.random() - 0.5) * 12;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.03 + 0.025;
+                this.rotation = Math.random() * Math.PI;
             }
             update() {
-                this.y += this.speedY;
                 this.x += this.speedX;
-                if (this.y > canvas.height) this.reset();
+                this.y += this.speedY;
+                this.speedX *= 0.96;
+                this.speedY *= 0.96;
+                this.life -= this.decay;
+                this.rotation += 0.15;
             }
             draw() {
                 ctx.save();
-                ctx.globalAlpha = this.alpha;
+                ctx.globalAlpha = Math.max(0, this.life);
                 ctx.fillStyle = this.color;
-                ctx.beginPath();
-                const pseudoScale = (this.y / canvas.height) * 1.5 + 0.5;
-                ctx.arc(this.x, this.y, this.size * pseudoScale, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                if (this.type === 'ring') {
+                    ctx.strokeStyle = this.color;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * (2 - this.life), 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (this.type === 'star') {
+                    ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size * this.life, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 ctx.restore();
             }
         }
 
-        function init25DGrid() {
-            gridPlanes = [];
-            for (let i = 0; i < 15; i++) {
-                gridPlanes.push({ yRatio: Math.pow(i / 15, 2) });
+        function spawnExplosion(x, y, color) {
+            for (let i = 0; i < 22; i++) {
+                particles.push(new Particle(x, y, color, i % 3 === 0 ? 'star' : 'dot'));
             }
+            particles.push(new Particle(x, y, color, 'ring'));
+            particles.push(new Particle(x, y, '#ffffff', 'ring'));
         }
 
-        function initBackgroundParticles() {
-            particles = [];
-            for (let i = 0; i < 70; i++) particles.push(new Particle());
+        function getMergeScreenPos(row, col) {
+            const dims = getCellRectAttributes();
+            const rect = gridContainer.getBoundingClientRect();
+            return {
+                x: rect.left + dims.padding + col * (dims.width + dims.gap) + dims.width / 2,
+                y: rect.top + dims.padding + row * (dims.height + dims.gap) + dims.height / 2
+            };
         }
 
-        function draw25DBackground() {
+        function unrotateCoord(r, c, times) {
+            const n = CONFIG.size;
+            for (let i = 0; i < times; i++) {
+                const nr = c;
+                const nc = n - 1 - r;
+                r = nr;
+                c = nc;
+            }
+            return { r, c };
+        }
+
+        function animateFX() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            ctx.strokeStyle = 'rgba(0, 255, 204, 0.04)';
-            ctx.lineWidth = 1;
-            const horizonY = canvas.height * 0.35;
-            const floorHeight = canvas.height - horizonY;
-
-            gridPlanes.forEach(plane => {
-                const currentY = horizonY + plane.yRatio * floorHeight;
-                ctx.beginPath();
-                ctx.moveTo(0, currentY);
-                ctx.lineTo(canvas.width, currentY);
-                ctx.stroke();
+            particles = particles.filter(p => p.life > 0);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
             });
+            requestAnimationFrame(animateFX);
+        }
+        animateFX();
 
-            const centerX = canvas.width / 2;
-            for (let x = -canvas.width; x <= canvas.width * 2; x += canvas.width / 10) {
-                ctx.beginPath();
-                ctx.moveTo(centerX, horizonY);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
+
+        /**
+         * INITIALIZATION & GRID GEOMETRY CALCULATORS
+         */
+        function initGame() {
+            gameState.grid = Array(CONFIG.size).fill(null).map(() => Array(CONFIG.size).fill(0));
+            gameState.score = 0;
+            gameState.level = 1;
+            gameState.currentTarget = 16;
+            gameState.isGameOver = false;
+            
+            // Wipe out old tile representations
+            tilesTrack.forEach(t => t.element.remove());
+            tilesTrack = [];
+            
+            updateScoreUI();
+            setupLevelParameters();
+            
+            // Add initial active values
+            generateRandomTile();
+            generateRandomTile();
+            
+            renderGridPositioning();
+            startTimer();
+        }
+
+        function setupLevelParameters() {
+            gameState.currentTarget = Math.pow(2, gameState.level + 3); // Level 1=16, 2=32, 3=64...
+            gameState.maxTime = Math.max(CONFIG.minTimeLimit, CONFIG.baseTime - (gameState.level - 1) * CONFIG.timeReductionPerLevel);
+            gameState.timeLeft = gameState.maxTime;
+            
+            levelVal.innerText = `LEVEL ${gameState.level}`;
+            targetVal.innerText = `HIT TARGET: ${gameState.currentTarget}`;
+            updateTimerBar();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            let lastTime = Date.now();
+            timerInterval = setInterval(() => {
+                if (gameState.isGameOver) return;
+                let now = Date.now();
+                let delta = now - lastTime;
+                lastTime = now;
+
+                gameState.timeLeft -= delta;
+                if (gameState.timeLeft <= 0) {
+                    gameState.timeLeft = 0;
+                    endGame(false, "Time limit exceeded for this level's target choice!");
+                }
+                updateTimerBar();
+            }, 100);
+        }
+
+        function updateTimerBar() {
+            const percentage = (gameState.timeLeft / gameState.maxTime) * 100;
+            progressFill.style.width = `${percentage}%`;
+            if (percentage < 30) {
+                progressFill.style.background = '#ff4757';
+            } else if (percentage < 60) {
+                progressFill.style.background = '#ffa502';
+            } else {
+                progressFill.style.background = 'linear-gradient(90deg, #2ed573, #ff4757)';
             }
-
-            particles.forEach(p => { p.update(); p.draw(); });
         }
 
-        function getChoicesCountForLevel(lvl) {
-            return Math.min(5 + Math.floor((lvl - 1) * 1.5), 15);
+        function updateScoreUI() {
+            scoreVal.innerText = gameState.score;
         }
 
-        function getTimerDrainRate(lvl) {
-            return 0.15 + lvl * 0.04;
+        function getCellRectAttributes() {
+            const sampleCell = document.querySelector('.grid-cell');
+            return {
+                width: sampleCell.offsetWidth,
+                height: sampleCell.offsetHeight,
+                gap: 12,
+                padding: 12
+            };
         }
 
-        function updateScoreDisplay() {
-            document.querySelector('#score-display .stat-value').textContent = state.score;
-        }
+        function generateRandomTile() {
+            let available = [];
+            for (let r = 0; r < CONFIG.size; r++) {
+                for (let c = 0; c < CONFIG.size; c++) {
+                    if (gameState.grid[r][c] === 0) available.push({r, c});
+                }
+            }
+            if (available.length > 0) {
+                let picked = available[Math.floor(Math.random() * available.length)];
+                // 90% chance of 2, 10% chance of 4
+                let choiceValue = Math.random() < 0.9 ? 2 : 4;
+                gameState.grid[picked.r][picked.c] = choiceValue;
 
-        function updateLevelDisplay() {
-            document.querySelector('#level-display .stat-value').textContent = state.level;
-        }
+                // Instantiate element
+                const element = document.createElement('div');
+                element.className = `tile tile-${choiceValue} tile-scale-up`;
+                element.innerText = choiceValue;
+                gridContainer.appendChild(element);
 
-        function setupNewTurn() {
-            const optionsCount = getChoicesCountForLevel(state.level);
-            const shuffledColors = [...ALL_COLORS].sort(() => 0.5 - Math.random());
-            state.activeColorsList = shuffledColors.slice(0, optionsCount);
-            state.currentTrueColor = state.activeColorsList[Math.floor(Math.random() * state.activeColorsList.length)];
-
-            const remainingTextColors = state.activeColorsList.filter(c => c.name !== state.currentTrueColor.name);
-            const illusionText = remainingTextColors[Math.floor(Math.random() * remainingTextColors.length)].name;
-
-            const wordEl = document.getElementById('illusion-word');
-            wordEl.textContent = illusionText;
-
-            const blockEl = document.getElementById('question-color-block');
-            const hex = state.currentTrueColor.hex;
-            blockEl.style.background = `linear-gradient(155deg, ${hex}, ${shadeColor(hex, -35)})`;
-            blockEl.style.boxShadow = `0 16px 40px rgba(0,0,0,0.5), 0 0 36px ${hex}55, inset 0 4px 16px rgba(255,255,255,0.2), inset 0 -6px 20px rgba(0,0,0,0.35)`;
-
-            blockEl.style.transform = 'scale(1.06)';
-            setTimeout(() => blockEl.style.transform = 'scale(1)', 120);
-
-            const grid = document.getElementById('options-grid');
-            grid.innerHTML = '';
-
-            const sortedChoices = [...state.activeColorsList].sort(() => 0.5 - Math.random());
-            sortedChoices.forEach(colorItem => {
-                const btn = document.createElement('button');
-                btn.className = 'name-btn';
-                btn.textContent = colorItem.name;
-
-                btn.addEventListener('pointerdown', (e) => {
-                    e.preventDefault();
-                    handleAnswerSelection(colorItem, btn);
+                tilesTrack.push({
+                    element: element,
+                    row: picked.r,
+                    col: picked.c,
+                    value: choiceValue,
+                    markedForDeletion: false
                 });
 
-                grid.appendChild(btn);
+                AudioEngine.play('spawn');
+            }
+        }
+
+        function renderGridPositioning() {
+            const dims = getCellRectAttributes();
+            
+            tilesTrack.forEach(tile => {
+                const targetX = dims.padding + tile.col * (dims.width + dims.gap);
+                const targetY = dims.padding + tile.row * (dims.height + dims.gap);
+                
+                tile.element.style.width = `${dims.width}px`;
+                tile.element.style.height = `${dims.height}px`;
+                tile.element.style.transform = `translate(${targetX}px, ${targetY}px)`;
+            });
+        }
+
+
+        /**
+         * GRID ACTION SWIPE MECHANICS ENGINE
+         */
+        function move(direction) {
+            if (gameState.isGameOver) return;
+            if (menuOverlay.classList.contains('active')) return;
+
+            let movedAny = false;
+            pendingMergeFX = [];
+
+            for (let i = 0; i < direction; i++) {
+                rotateGridClockwise();
+            }
+
+            for (let r = 0; r < CONFIG.size; r++) {
+                let rowValues = gameState.grid[r].filter(v => v !== 0);
+                let newRow = [];
+
+                for (let c = 0; c < rowValues.length; c++) {
+                    if (rowValues[c] === rowValues[c + 1] && rowValues[c] !== undefined) {
+                        let combinedVal = rowValues[c] * 2;
+                        let mergedCol = newRow.length;
+                        newRow.push(combinedVal);
+                        gameState.score += combinedVal;
+                        pendingMergeFX.push({ r, c: mergedCol, value: combinedVal });
+                        checkTargetMilestoneAchievement(combinedVal);
+                        c++;
+                        movedAny = true;
+                    } else {
+                        newRow.push(rowValues[c]);
+                    }
+                }
+
+                while (newRow.length < CONFIG.size) newRow.push(0);
+
+                if (JSON.stringify(gameState.grid[r]) !== JSON.stringify(newRow)) {
+                    movedAny = true;
+                }
+                gameState.grid[r] = newRow;
+            }
+
+            const unrot = (4 - direction) % 4;
+            pendingMergeFX = pendingMergeFX.map(m => {
+                const pos = unrotateCoord(m.r, m.c, unrot);
+                return { r: pos.r, c: pos.c, value: m.value };
             });
 
-            state.timeRemaining = 100;
-        }
+            for (let i = 0; i < unrot; i++) {
+                rotateGridClockwise();
+            }
 
-        function shadeColor(hex, amount) {
-            const num = parseInt(hex.replace('#', ''), 16);
-            const r = Math.min(255, Math.max(0, (num >> 16) + amount));
-            const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
-            const b = Math.min(255, Math.max(0, (num & 0xff) + amount));
-            return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-        }
-
-        function handleAnswerSelection(selectedColor, btnEl) {
-            if (!state.isGameActive) return;
-
-            const container = document.getElementById('game-container');
-            const targetCon = document.getElementById('target-container');
-
-            if (selectedColor.name === state.currentTrueColor.name) {
-                state.score += 10 * state.level;
-                updateScoreDisplay();
-                AudioEngine.playLaser(true);
-
-                if (btnEl) {
-                    btnEl.style.borderColor = '#00ffcc';
-                    btnEl.style.boxShadow = '0 0 20px rgba(0,255,204,0.5)';
-                }
-
-                container.classList.add('flash-green');
-                targetCon.classList.add('correct-pop');
+            if (movedAny) {
+                playMergeEffects();
+                realignTrackedDataMapping();
                 setTimeout(() => {
-                    container.classList.remove('flash-green');
-                    targetCon.classList.remove('correct-pop');
-                }, 300);
-
-                const structuralNextLevel = Math.floor(state.score / 40) + 1;
-                if (structuralNextLevel > state.level) {
-                    state.level = structuralNextLevel;
-                    updateLevelDisplay();
-                    AudioEngine.playLevelUp();
-                }
-
-                setupNewTurn();
+                    generateRandomTile();
+                    renderGridPositioning();
+                    checkIfGameIsLocked();
+                }, 130);
             } else {
-                if (btnEl) {
-                    btnEl.style.borderColor = '#ff0055';
-                    btnEl.style.boxShadow = '0 0 20px rgba(255,0,85,0.5)';
+                pendingMergeFX = [];
+            }
+        }
+
+        function playMergeEffects() {
+            pendingMergeFX.forEach(m => {
+                const pos = getMergeScreenPos(m.r, m.c);
+                spawnExplosion(pos.x, pos.y, getTileColor(m.value));
+            });
+        }
+
+        function rotateGridClockwise() {
+            let n = CONFIG.size;
+            let temp = Array(n).fill(null).map(() => Array(n).fill(0));
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    temp[c][n - 1 - r] = gameState.grid[r][c];
                 }
-                triggerFailureJuice();
+            }
+            gameState.grid = temp;
+        }
+
+        function checkTargetMilestoneAchievement(val) {
+            if (val >= gameState.currentTarget) {
+                AudioEngine.play('target');
+                // Trigger celebratory visual explosion FX over center
+                spawnExplosion(window.innerWidth/2, window.innerHeight/3, '#ffa502');
+                
+                gameState.level++;
+                gameState.score += 500; // Bonus injection
+                setupLevelParameters();
+            } else {
+                AudioEngine.play('merge');
             }
         }
 
-        function triggerFailureJuice() {
-            AudioEngine.playLaser(false);
-            const container = document.getElementById('game-container');
-            const targetCon = document.getElementById('target-container');
+        function realignTrackedDataMapping() {
+            tilesTrack.forEach(t => t.element.remove());
+            tilesTrack = [];
 
-            container.classList.add('flash-red');
-            targetCon.classList.add('shake');
+            for (let r = 0; r < CONFIG.size; r++) {
+                for (let c = 0; c < CONFIG.size; c++) {
+                    if (gameState.grid[r][c] !== 0) {
+                        const val = gameState.grid[r][c];
+                        const element = document.createElement('div');
+                        const isMerge = pendingMergeFX.some(m => m.r === r && m.c === c && m.value === val);
+                        element.className = `tile tile-${val}${isMerge ? ' tile-merge-anim' : ''}`;
+                        element.innerText = val;
+                        gridContainer.appendChild(element);
 
-            setTimeout(() => {
-                container.classList.remove('flash-red');
-                targetCon.classList.remove('shake');
-                endGame();
-            }, 400);
+                        tilesTrack.push({
+                            element: element,
+                            row: r,
+                            col: c,
+                            value: val
+                        });
+                    }
+                }
+            }
+            pendingMergeFX = [];
+            updateScoreUI();
+            renderGridPositioning();
         }
 
-        function endGame() {
-            state.isGameActive = false;
-            document.getElementById('game-over-screen').classList.remove('hidden');
-            document.getElementById('final-stats').innerHTML =
-                `You survived up to <b>Level ${state.level}</b><br>Final Score: <b>${state.score}</b>`;
+        function checkIfGameIsLocked() {
+            // Check empty spots
+            for (let r = 0; r < CONFIG.size; r++) {
+                for (let c = 0; c < CONFIG.size; c++) {
+                    if (gameState.grid[r][c] === 0) return; // Still playable space available
+                    if (r < CONFIG.size - 1 && gameState.grid[r][c] === gameState.grid[r+1][c]) return;
+                    if (c < CONFIG.size - 1 && gameState.grid[r][c] === gameState.grid[r][c+1]) return;
+                }
+            }
+            endGame(true, "No valid matching combination configurations left on grid board!");
         }
 
-        function startGame() {
+        function endGame(noMovesLeft = false, reasonText = "") {
+            gameState.isGameOver = true;
+            clearInterval(timerInterval);
+            AudioEngine.play('gameover');
+            
+            gameoverReason.innerText = reasonText;
+            finalScoreVal.innerText = gameState.score;
+            gameoverOverlay.classList.add('active');
+        }
+
+
+        /**
+         * TOUCH / SWIPE — pointer events on grid (mobile fix)
+         */
+        function canSwipe() {
+            return !gameState.isGameOver && !menuOverlay.classList.contains('active') && !gameoverOverlay.classList.contains('active');
+        }
+
+        function handleSwipeStart(clientX, clientY) {
+            if (!canSwipe()) return;
+            pointerActive = true;
+            pointerStartX = clientX;
+            pointerStartY = clientY;
             AudioEngine.init();
-            state.score = 0;
-            state.level = 1;
-            state.isGameActive = true;
-            updateScoreDisplay();
-            updateLevelDisplay();
-            document.getElementById('start-screen').classList.add('hidden');
-            document.getElementById('game-over-screen').classList.add('hidden');
-            setupNewTurn();
         }
 
-        function engineLoop() {
-            draw25DBackground();
+        function handleSwipeEnd(clientX, clientY) {
+            if (!pointerActive) return;
+            pointerActive = false;
 
-            if (state.isGameActive) {
-                state.timeRemaining -= getTimerDrainRate(state.level);
-                document.getElementById('timer-bar').style.width = `${Math.max(0, state.timeRemaining)}%`;
+            const diffX = clientX - pointerStartX;
+            const diffY = clientY - pointerStartY;
 
-                if (state.timeRemaining <= 0) triggerFailureJuice();
+            if (Math.max(Math.abs(diffX), Math.abs(diffY)) < SWIPE_THRESHOLD) return;
+
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                move(diffX > 0 ? 1 : 3);
+            } else {
+                move(diffY > 0 ? 2 : 0);
             }
-
-            requestAnimationFrame(engineLoop);
         }
 
-        resizeCanvas();
-        initBackgroundParticles();
-        requestAnimationFrame(engineLoop);
+        gridContainer.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handleSwipeStart(e.clientX, e.clientY);
+            try { gridContainer.setPointerCapture(e.pointerId); } catch (_) {}
+        });
 
-        document.getElementById('start-btn').addEventListener('click', startGame);
-        document.getElementById('restart-btn').addEventListener('click', startGame);
+        gridContainer.addEventListener('pointerup', (e) => {
+            e.preventDefault();
+            handleSwipeEnd(e.clientX, e.clientY);
+        });
+
+        gridContainer.addEventListener('pointercancel', () => {
+            pointerActive = false;
+        });
+
+        gridContainer.addEventListener('touchstart', (e) => {
+            if (!canSwipe()) return;
+            e.preventDefault();
+            const t = e.changedTouches[0] || e.touches[0];
+            handleSwipeStart(t.clientX, t.clientY);
+        }, { passive: false });
+
+        gridContainer.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const t = e.changedTouches[0];
+            if (t) handleSwipeEnd(t.clientX, t.clientY);
+        }, { passive: false });
+
+        gridContainer.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        window.addEventListener('keydown', e => {
+            if (!canSwipe()) return;
+            if (['ArrowUp', 'KeyW'].includes(e.code)) { e.preventDefault(); move(0); }
+            if (['ArrowRight', 'KeyD'].includes(e.code)) { e.preventDefault(); move(1); }
+            if (['ArrowDown', 'KeyS'].includes(e.code)) { e.preventDefault(); move(2); }
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) { e.preventDefault(); move(3); }
+        });
+
+
+        /**
+         * SCREEN ACTIONS ACTION REGISTER listeners
+         */
+        document.getElementById('start-action').addEventListener('click', () => {
+            AudioEngine.init();
+            menuOverlay.classList.remove('active');
+            initGame();
+        });
+
+        document.getElementById('retry-action').addEventListener('click', () => {
+            gameoverOverlay.classList.remove('active');
+            initGame();
+        });
+
+        document.getElementById('restart-action').addEventListener('click', () => {
+            if (confirm("Reset layout and re-instantiate session match progress?")) {
+                initGame();
+            }
+        });
+
+        const muteBtn = document.getElementById('mute-btn');
+        muteBtn.addEventListener('click', () => {
+            gameState.soundMuted = !gameState.soundMuted;
+            muteBtn.innerText = gameState.soundMuted ? '🔇' : '🔊';
+        });
+
+        // Initial setup update positioning values natively
+        setTimeout(renderGridPositioning, 200);
+
     </script>
 </body>
 </html>
