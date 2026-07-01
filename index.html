@@ -537,7 +537,10 @@ const LAYER_GAP = 1.85;
 const TOWER_RADIUS = 2.35;
 const LAYER_HEIGHT = 0.34;
 const LAYER_TOP = LAYER_HEIGHT / 2;
-const BALL_WORLD_ANGLE = 0; // fixed world direction — rotate tower to align gaps here
+const RING_INNER = TOWER_RADIUS * 0.62;
+const RING_OUTER = TOWER_RADIUS;
+const BALL_ORBIT_R = (RING_INNER + RING_OUTER) * 0.5; // mid of platform — ball rides the ring
+const BALL_WORLD_ANGLE = 0.38; // front-right rim; never on the centre pole (π/2 → x=0)
 const SEGMENTS_PER_LAYER = 8;
 const GAP_SEGMENTS = 2;       // how many contiguous segments are "open"
 const DANGER_CHANCE = 0.16;
@@ -802,23 +805,28 @@ function addLayerAtBottom(){
 function resetGame(){
   score = 0;
   comboStreak = 0;
-  ballY = -1.2;
-  prevBallY = -1.2;
   ballVelY = 0;
   towerRotation = 0;
   currentRotVel = 0;
   TOWER_GROUP.rotation.y = 0;
   buildInitialTower();
+  // Start on top of the first ring surface, then drop
+  const firstTop = layers[0].y + LAYER_TOP + BALL_RADIUS;
+  ballY = firstTop + 0.15;
+  prevBallY = ballY;
+  ballVelY = -0.8;
   updateBallWorldPos();
   document.getElementById('score').textContent = '0';
 }
 
 function updateBallWorldPos(){
-  // Ball drops through the centre hole — rotate the tower to line up gaps
-  ball.position.x = 0;
-  ball.position.z = 0;
+  ball.position.x = Math.cos(BALL_WORLD_ANGLE) * BALL_ORBIT_R;
+  ball.position.z = Math.sin(BALL_WORLD_ANGLE) * BALL_ORBIT_R;
   ball.position.y = ballY;
 }
+
+function ballX(){ return Math.cos(BALL_WORLD_ANGLE) * BALL_ORBIT_R; }
+function ballZ(){ return Math.sin(BALL_WORLD_ANGLE) * BALL_ORBIT_R; }
 
 function layerTopY(l){ return l.y + LAYER_TOP; }
 function layerBottomY(l){ return l.y - LAYER_TOP; }
@@ -842,7 +850,10 @@ function resolveCollisions(prevY){
   if(ballVelY < 0){
     const sorted = [...layers].sort((a, b) => b.y - a.y);
     for(const l of sorted){
-      if(!crossedPlaneDown(prevY, ballY, topHit(l))) continue;
+      const surface = topHit(l);
+      const crossed = crossedPlaneDown(prevY, ballY, surface);
+      const penetrating = ballY <= surface && prevY > surface - 0.05;
+      if(!crossed && !penetrating) continue;
 
       if(layerIsGapAtBall(l)){
         if(l.angleIsDanger(BALL_WORLD_ANGLE)){ onDeath(); return; }
@@ -854,14 +865,14 @@ function resolveCollisions(prevY){
           Audio_.pass(comboStreak);
           showCombo(comboStreak);
         }
-        continue;
+        continue; // fall through gap on the ring
       }
 
-      ballY = topHit(l) + 0.01;
+      ballY = surface + 0.01;
       ballVelY = BOUNCE_VEL;
       comboStreak = 0;
       Audio_.bounce(Math.random() * 3);
-      spawnParticle(0, ballY, 0);
+      spawnParticle(ballX(), ballY, ballZ());
       updateBallWorldPos();
       recycleLayers();
       return;
@@ -1027,13 +1038,13 @@ function animate(now){
   camera.position.x += (0 - camera.position.x) * 0.15;
   // Keep lights locked to camera so brightness never fades as you descend
   spot.position.set(0, camera.position.y + 12, camera.position.z - 4);
-  spot.target.position.set(0, ball.position.y - 0.5, 0);
+  spot.target.position.set(ball.position.x, ball.position.y - 0.5, ball.position.z);
   rimCyan.position.set(-5, camera.position.y, camera.position.z - 5);
   rimMagenta.position.set(5, camera.position.y - 1, camera.position.z - 5);
   beam.position.y = camera.position.y - 2;
   TOWER_GROUP.position.y = 0;
   floorMesh.position.y = layers.length ? layers[layers.length-1].y - 1.2 : -30;
-  camera.lookAt(0, ball.position.y - 0.5, 0);
+  camera.lookAt(ball.position.x, ball.position.y - 0.4, ball.position.z);
 
   // screen shake (preserve front-facing camera z)
   if(shakeTime > 0){
