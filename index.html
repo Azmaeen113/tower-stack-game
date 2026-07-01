@@ -4,16 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Apex Archer</title>
+    <!-- Keep apexshooterbackground.webp in the same folder as this HTML when copying to your webapp -->
+    <link rel="preload" as="image" href="apexshooterbackground.webp">
     <style>
         :root { --primary: #c0392b; --gold: #f1c40f; --dark: #1a1208; }
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: none; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: var(--dark); font-family: 'Segoe UI', system-ui, sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #2d4a28; font-family: 'Segoe UI', system-ui, sans-serif; }
         #game-container {
             position: relative; width: 100%; height: 100%;
             display: flex; justify-content: center; align-items: center;
-            background: linear-gradient(180deg, #87CEEB 0%, #5a9e6f 38%, #3d6b3a 55%, #2d4a28 100%);
+            background-color: #3d6b3a;
+            background-image: url('apexshooterbackground.webp');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
         }
-        canvas { display: block; width: 100%; height: 100%; }
+        canvas { display: block; width: 100%; height: 100%; background: transparent; }
         .top-hud {
             position: absolute; top: 0; left: 0; right: 0; z-index: 8;
             padding: 10px 12px 12px;
@@ -585,30 +591,10 @@ function update() {
 
 function drawBackground() {
     const h = canvas.height, w = canvas.width;
-    const sky = ctx.createLinearGradient(0, 0, 0, h * 0.55);
-    sky.addColorStop(0, '#6eb5e0');
-    sky.addColorStop(1, '#a8d8a0');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h * 0.55);
-
-    const ground = ctx.createLinearGradient(0, h * 0.5, 0, h);
-    ground.addColorStop(0, '#5a9a52');
-    ground.addColorStop(0.4, '#3d7038');
-    ground.addColorStop(1, '#2a4a26');
-    ctx.fillStyle = ground;
-    ctx.fillRect(0, h * 0.5, w, h * 0.5);
-
-    ctx.fillStyle = 'rgba(0,0,0,0.08)';
-    for (let i = 0; i < 8; i++) {
-        ctx.beginPath();
-        ctx.ellipse(w * (0.1 + i * 0.12), h * 0.52, 40 + i * 5, 12, 0, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
     if (Math.abs(gameState.windX) > 0.02) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
         ctx.lineWidth = 1;
-        for (let y = 20; y < h * 0.5; y += 35) {
+        for (let y = 20; y < h * 0.55; y += 35) {
             ctx.beginPath();
             ctx.moveTo(0, y);
             ctx.lineTo(w, y + gameState.windX * 80);
