@@ -625,20 +625,33 @@ class Layer {
   }
   // worldAngle: fixed angle in world space where the ball sits (we use 0).
   // Total rotation applied to this layer's ring = its own base rotation + the parent tower group's rotation.
-  angleIsGap(worldAngle){
-    return this.segmentIsGap(this.segmentIndexAt(worldAngle));
-  }
   segmentIndexAt(worldAngle){
     const totalRot = this.group.rotation.y + TOWER_GROUP.rotation.y;
     let local = worldAngle - totalRot;
     local = ((local % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    return Math.floor(local / this.segAngle) % SEGMENTS_PER_LAYER;
+    return Math.floor((local + this.segAngle * 0.03) / this.segAngle) % SEGMENTS_PER_LAYER;
   }
   segmentIsGap(segIdx){
     for(let g = this.gapStart; g < this.gapEnd; g++){
       if((g % SEGMENTS_PER_LAYER) === segIdx) return true;
     }
     return false;
+  }
+  // True when a solid mesh arc covers the ball's world angle (matches visuals exactly)
+  isSolidAtAngle(worldAngle){
+    if(this.segments.length === 0) return false;
+    const totalRot = this.group.rotation.y + TOWER_GROUP.rotation.y;
+    let local = worldAngle - totalRot;
+    local = ((local % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    for(const sg of this.segments){
+      const start = sg.thetaStart;
+      const end = start + sg.thetaLen;
+      if(local >= start - 0.02 && local < end + 0.02) return true;
+    }
+    return false;
+  }
+  angleIsGap(worldAngle){
+    return !this.isSolidAtAngle(worldAngle);
   }
   angleIsDanger(worldAngle){
     const segIdx = this.segmentIndexAt(worldAngle);
@@ -831,15 +844,15 @@ function layerTopY(l){ return l.y + LAYER_TOP; }
 function layerBottomY(l){ return l.y - LAYER_TOP; }
 
 function layerIsGapAtBall(l){
-  return l.segments.length === 0 || l.angleIsGap(BALL_WORLD_ANGLE);
+  return l.angleIsGap(BALL_WORLD_ANGLE);
 }
 
 function crossedPlaneDown(prevY, currY, planeY){
-  return currY < prevY && prevY >= planeY && currY <= planeY;
+  return currY < prevY && prevY >= planeY - 0.02 && currY <= planeY + 0.02;
 }
 
 function crossedPlaneUp(prevY, currY, planeY){
-  return currY > prevY && prevY <= planeY && currY >= planeY;
+  return currY > prevY && prevY <= planeY + 0.02 && currY >= planeY - 0.02;
 }
 
 function resolveCollisions(prevY){
@@ -849,10 +862,13 @@ function resolveCollisions(prevY){
     const sorted = [...layers].sort((a, b) => b.y - a.y);
     for(const l of sorted){
       const surface = topHit(l);
-      if(ballY > surface + 0.08) continue; // not near this layer yet
+
+      // Already passed this layer — never bounce on it again while below
+      if(ballY < surface - 0.06) continue;
+
       const crossed = crossedPlaneDown(prevY, ballY, surface);
-      const onSurface = ballY <= surface + 0.02 && prevY >= surface - 0.02;
-      if(!crossed && !onSurface) continue;
+      const landing = crossed || (ballY <= surface + 0.015 && ballVelY < 0 && prevY > ballY);
+      if(!landing) continue;
 
       if(layerIsGapAtBall(l)){
         if(l.angleIsDanger(BALL_WORLD_ANGLE)){ onDeath(); return; }
@@ -864,6 +880,7 @@ function resolveCollisions(prevY){
           Audio_.pass(comboStreak);
           showCombo(comboStreak);
         }
+        // Keep falling — do NOT bounce
         continue;
       }
 
