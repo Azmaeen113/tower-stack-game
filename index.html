@@ -579,8 +579,8 @@ class Layer {
     this.group.position.y = y;
     this.rotation = Math.random()*Math.PI*2;
     this.group.rotation.y = this.rotation;
-    this.segments = []; // {mesh, isGap, isDanger, angleStart, angleLen}
-    this.passed = false;
+    this.segments = [];
+    this.gapCleared = false;
     this.build();
     TOWER_GROUP.add(this.group);
   }
@@ -766,7 +766,8 @@ let shakeTime = 0;
 let prevBallY = -1.2;
 
 const GRAVITY = -11.5;
-const BOUNCE_VEL = 5.8;
+const BOUNCE_VEL = 3.4;
+const MAX_UPWARD_VEL = 4.2;
 const BALL_RADIUS = 0.32;
 
 function clearTower(){
@@ -820,19 +821,70 @@ function updateBallWorldPos(){
   ball.position.y = ballY;
 }
 
-function layerSurfaceY(l){ return l.y + LAYER_TOP; }
+function layerTopY(l){ return l.y + LAYER_TOP; }
+function layerBottomY(l){ return l.y - LAYER_TOP; }
+function layerSurfaceY(l){ return layerTopY(l); }
 
-function ballCrossedLayer(prevY, currY, l){
-  if(currY >= prevY) return false; // only when falling
-  const hitY = layerSurfaceY(l) + BALL_RADIUS;
-  return prevY >= hitY && currY <= hitY;
+function ballOverlapsLayerY(l){
+  const ballBot = ballY - BALL_RADIUS;
+  const ballTop = ballY + BALL_RADIUS;
+  return ballTop >= layerBottomY(l) && ballBot <= layerTopY(l);
 }
 
-function getLayersCrossedThisFrame(prevY, currY){
-  if(currY >= prevY) return [];
-  return layers
-    .filter(l => !l.passed && ballCrossedLayer(prevY, currY, l))
-    .sort((a, b) => b.y - a.y);
+function layerIsGapAtBall(l){
+  return l.segments.length === 0 || l.angleIsGap(BALL_WORLD_ANGLE);
+}
+
+function crossedTopDownward(prevY, currY, l){
+  const topHit = layerTopY(l) + BALL_RADIUS;
+  return currY < prevY && prevY >= topHit && currY <= topHit;
+}
+
+function resolveCollisions(prevY){
+  // Falling: highest layer first; rising underside hits: lowest first
+  const sorted = [...layers].sort((a, b) => ballVelY < 0 ? b.y - a.y : a.y - b.y);
+
+  for(const l of sorted){
+    const isGap = layerIsGapAtBall(l);
+
+    if(isGap){
+      if(l.angleIsDanger(BALL_WORLD_ANGLE)){
+        onDeath();
+        return;
+      }
+      if(!l.gapCleared && ballVelY < 0 && crossedTopDownward(prevY, ballY, l)){
+        l.gapCleared = true;
+        score++;
+        comboStreak++;
+        document.getElementById('score').textContent = score;
+        Audio_.pass(comboStreak);
+        showCombo(comboStreak);
+      }
+      continue;
+    }
+
+    // Solid segment at ball angle — block penetration
+    if(!ballOverlapsLayerY(l)) continue;
+
+    if(ballVelY <= 0){
+      ballY = layerTopY(l) + BALL_RADIUS + 0.002;
+      ballVelY = BOUNCE_VEL;
+      comboStreak = 0;
+      Audio_.bounce(Math.random() * 3);
+      spawnParticle(ball.position.x, ballY, ball.position.z);
+      updateBallWorldPos();
+      recycleLayers();
+      return;
+    }
+
+    ballY = layerBottomY(l) - BALL_RADIUS - 0.002;
+    ballVelY = -Math.abs(ballVelY) * 0.25;
+    updateBallWorldPos();
+    recycleLayers();
+    return;
+  }
+
+  recycleLayers();
 }
 
 /* ---------------- Input (drag to rotate) ---------------- */
@@ -927,38 +979,7 @@ function showCombo(streak){
 let lastTime = performance.now();
 
 function checkCollisionAndScore(){
-  if(ballVelY >= 0){ recycleLayers(); return; }
-
-  const crossed = getLayersCrossedThisFrame(prevBallY, ballY);
-
-  for(const l of crossed){
-    const isGap = l.segments.length === 0 || l.angleIsGap(BALL_WORLD_ANGLE);
-
-    if(isGap){
-      if(l.angleIsDanger(BALL_WORLD_ANGLE)){
-        onDeath();
-        return;
-      }
-      l.passed = true;
-      score++;
-      comboStreak++;
-      document.getElementById('score').textContent = score;
-      Audio_.pass(comboStreak);
-      showCombo(comboStreak);
-      continue;
-    }
-
-    l.passed = true;
-    ballY = layerSurfaceY(l) + BALL_RADIUS;
-    ballVelY = BOUNCE_VEL;
-    comboStreak = 0;
-    Audio_.bounce(Math.random() * 3);
-    spawnParticle(ball.position.x, ballY, ball.position.z);
-    updateBallWorldPos();
-    break;
-  }
-
-  recycleLayers();
+  resolveCollisions(prevBallY);
 }
 
 function recycleLayers(){
@@ -986,6 +1007,8 @@ function animate(now){
     for(let s = 0; s < steps; s++){
       prevBallY = ballY;
       ballVelY += GRAVITY * subDt;
+      ballVelY = Math.max(ballVelY, -22);
+      ballVelY = Math.min(ballVelY, MAX_UPWARD_VEL);
       ballY += ballVelY * subDt;
       updateBallWorldPos();
       checkCollisionAndScore();
