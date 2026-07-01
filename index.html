@@ -75,6 +75,32 @@
   }
   #best span{color:var(--gold);font-weight:700;}
 
+  /* lives — top right */
+  #livesHud{
+    position:absolute;
+    top:calc(16px + env(safe-area-inset-top));
+    right:16px;
+    z-index:20;
+    display:flex;gap:7px;align-items:center;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .45s ease;
+  }
+  #livesHud.visible{opacity:1;}
+  #livesHud .heart{
+    width:26px;height:26px;
+    fill:#ff2d55;
+    filter:drop-shadow(0 0 8px rgba(255,45,85,0.65));
+    transition:fill .3s ease, opacity .3s ease, filter .3s ease;
+  }
+  #livesHud .heart.lost{
+    fill:transparent;
+    opacity:0.38;
+    filter:none;
+    stroke:#ff2d55;
+    stroke-width:1.8px;
+  }
+
   /* top-left mute */
   #muteBtn{
     position:absolute;
@@ -287,6 +313,12 @@
   <button id="muteBtn" aria-label="Mute">
     <svg id="muteIcon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-.77-3.29-2-4.24v8.47c1.23-.94 2-2.46 2-4.23z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
   </button>
+
+  <div id="livesHud" aria-label="Lives">
+    <svg class="heart" viewBox="0 0 24 24" data-i="0"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    <svg class="heart" viewBox="0 0 24 24" data-i="1"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+    <svg class="heart" viewBox="0 0 24 24" data-i="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+  </div>
 
   <div class="hint-swipe" id="dragHint">DRAG TO ROTATE</div>
 
@@ -523,8 +555,8 @@ const BALL_WORLD_ANGLE = Math.PI / 2; // +Z = front of screen, x=0 keeps tower c
 const TITLE_SCENE_LIFT = 3.6; // raise tower + ball on splash
 const TITLE_CAM_OFFSET = 0.95;
 const SEGMENTS_PER_LAYER = 8;
-const GAP_SEGMENTS = 2;       // how many contiguous segments are "open"
-const DANGER_CHANCE = 0.16;
+const GAP_SEGMENTS = 2;
+const MAX_LIVES = 3;
 
 const COLORS = [0x00e5ff, 0xff2e9c, 0xffd23f, 0xff8a00];
 let colorCursor = 0;
@@ -554,6 +586,60 @@ function makeArcSegmentGeometry(innerR, outerR, thetaStart, thetaLen, height){
   return geo;
 }
 
+function segmentInGap(s, gapStart, gapEnd){
+  if(s >= gapStart && s < gapEnd) return true;
+  if(gapEnd > SEGMENTS_PER_LAYER && s < gapEnd % SEGMENTS_PER_LAYER) return true;
+  return false;
+}
+
+/** How many danger tiles on this layer — ramps up with depth. */
+function dangerCountForLayer(index){
+  if(index < 3) return 0;
+  const d = index - 3;
+  if(d < 6) return Math.random() < 0.38 ? 1 : 0;
+  if(d < 14){
+    const r = Math.random();
+    if(r < 0.22) return 2;
+    return r < 0.62 ? 1 : 0;
+  }
+  const r = Math.random();
+  if(r < 0.28) return 3;
+  if(r < 0.68) return 2;
+  return 1;
+}
+
+function pickDangerSegments(gapStart, gapEnd, count){
+  const pool = [];
+  for(let s = 0; s < SEGMENTS_PER_LAYER; s++){
+    if(!segmentInGap(s, gapStart, gapEnd)) pool.push(s);
+  }
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return new Set(pool.slice(0, Math.min(count, pool.length)));
+}
+
+function makeDangerCross(thetaStart, segAngle){
+  const g = new THREE.Group();
+  const thetaMid = thetaStart + segAngle * 0.47;
+  const rMid = (RING_INNER + RING_OUTER) * 0.5;
+  g.position.set(
+    Math.cos(thetaMid) * rMid,
+    LAYER_TOP + 0.05,
+    Math.sin(thetaMid) * rMid
+  );
+  g.rotation.y = -thetaMid;
+  const mat = new THREE.MeshBasicMaterial({color:0x080808});
+  const len = 0.62, h = 0.055, thick = 0.09;
+  const barA = new THREE.Mesh(new THREE.BoxGeometry(len, h, thick), mat);
+  const barB = barA.clone();
+  barA.rotation.y = Math.PI / 4;
+  barB.rotation.y = -Math.PI / 4;
+  g.add(barA, barB);
+  return g;
+}
+
 class Layer {
   constructor(y, index){
     this.y = y;
@@ -569,38 +655,35 @@ class Layer {
   }
   build(){
     const segAngle = (Math.PI*2)/SEGMENTS_PER_LAYER;
-    // pick gap start
     const gapStart = Math.floor(Math.random()*SEGMENTS_PER_LAYER);
-    const dangerAllowed = this.index > 2; // first few layers safe
-    let dangerIdx = -1;
-    if(dangerAllowed && Math.random() < DANGER_CHANCE + Math.min(this.index*0.01,0.18)){
-      do { dangerIdx = Math.floor(Math.random()*SEGMENTS_PER_LAYER); }
-      while(dangerIdx >= gapStart && dangerIdx < gapStart+GAP_SEGMENTS);
-    }
+    const gapEnd = gapStart + GAP_SEGMENTS;
+    const dangerSet = pickDangerSegments(gapStart, gapEnd, dangerCountForLayer(this.index));
     const baseColor = nextColor();
     for(let s=0; s<SEGMENTS_PER_LAYER; s++){
-      const isGap = (s >= gapStart && s < gapStart+GAP_SEGMENTS) ||
-                    (gapStart+GAP_SEGMENTS > SEGMENTS_PER_LAYER && s < (gapStart+GAP_SEGMENTS)%SEGMENTS_PER_LAYER);
-      if(isGap) continue;
-      const isDanger = s === dangerIdx;
+      if(segmentInGap(s, gapStart, gapEnd)) continue;
+      const isDanger = dangerSet.has(s);
       const thetaStart = s*segAngle;
       const geo = makeArcSegmentGeometry(TOWER_RADIUS*0.62, TOWER_RADIUS, thetaStart, segAngle*0.94, 0.34);
-      const color = isDanger ? 0xff2d55 : baseColor;
+      const color = isDanger ? 0xff3d5c : baseColor;
       const mat = new THREE.MeshStandardMaterial({
         color: color,
-        emissive: color,
-        emissiveIntensity: isDanger ? 0.55 : 0.35,
+        emissive: isDanger ? 0x660018 : color,
+        emissiveIntensity: isDanger ? 0.45 : 0.35,
         metalness:0.55,
-        roughness:0.28,
+        roughness: isDanger ? 0.35 : 0.28,
       });
       const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = false;
       this.group.add(mesh);
-      this.segments.push({mesh, isGap:false, isDanger, thetaStart, thetaLen:segAngle*0.94});
+      let cross = null;
+      if(isDanger){
+        cross = makeDangerCross(thetaStart, segAngle);
+        this.group.add(cross);
+      }
+      this.segments.push({mesh, cross, isGap:false, isDanger, segIdx:s, thetaStart, thetaLen:segAngle*0.94});
     }
-    // store gap info for collision
     this.gapStart = gapStart;
-    this.gapEnd = gapStart+GAP_SEGMENTS;
+    this.gapEnd = gapEnd;
     this.segAngle = segAngle;
   }
   // worldAngle: fixed angle in world space where the ball sits (we use 0).
@@ -627,11 +710,20 @@ class Layer {
   }
   angleIsDanger(worldAngle){
     const segIdx = this.segmentIndexAt(worldAngle);
-    return this.segments.some(sg => sg.isDanger && Math.floor(sg.thetaStart / this.segAngle) === segIdx);
+    return this.segments.some(sg => sg.isDanger && sg.segIdx === segIdx);
   }
   destroy(){
     TOWER_GROUP.remove(this.group);
-    this.segments.forEach(sg=>{ sg.mesh.geometry.dispose(); sg.mesh.material.dispose(); });
+    this.segments.forEach(sg=>{
+      sg.mesh.geometry.dispose();
+      sg.mesh.material.dispose();
+      if(sg.cross){
+        sg.cross.traverse(o=>{
+          if(o.geometry) o.geometry.dispose();
+          if(o.material) o.material.dispose();
+        });
+      }
+    });
   }
 }
 
@@ -751,6 +843,8 @@ let nextLayerIndex = 0;
 let started = false;
 let shakeTime = 0;
 let prevBallY = -1.2;
+let lives = MAX_LIVES;
+let invulnTime = 0;
 
 const GRAVITY = -11.5;
 // Bounce peak ≤ one stack gap: h = v²/(2g)
@@ -787,9 +881,19 @@ function addLayerAtBottom(){
   layers.push(l);
 }
 
+function updateHeartsUI(){
+  const hearts = document.querySelectorAll('#livesHud .heart');
+  hearts.forEach((el, i)=>{
+    el.classList.toggle('lost', i >= lives);
+  });
+}
+
 function resetGame(){
   score = 0;
   comboStreak = 0;
+  lives = MAX_LIVES;
+  invulnTime = 0;
+  updateHeartsUI();
   ballVelY = 0;
   towerRotation = 0;
   currentRotVel = 0;
@@ -839,7 +943,6 @@ function resolveCollisions(prevY){
       if(!crossedPlaneDown(prevY, ballY, surface)) continue;
 
       if(layerIsGapAtBall(l)){
-        if(l.angleIsDanger(BALL_WORLD_ANGLE)){ onDeath(); return; }
         if(!l.gapCleared){
           l.gapCleared = true;
           score++;
@@ -849,6 +952,11 @@ function resolveCollisions(prevY){
           showCombo(comboStreak);
         }
         continue;
+      }
+
+      if(l.angleIsDanger(BALL_WORLD_ANGLE) && invulnTime <= 0){
+        onDangerHit(l, surface);
+        return;
       }
 
       ballY = surface + 0.01;
@@ -875,6 +983,29 @@ function resolveCollisions(prevY){
     }
   }
 
+  recycleLayers();
+}
+
+function onDangerHit(l, surface){
+  lives--;
+  updateHeartsUI();
+  Audio_.hit();
+  shakeTime = 0.35;
+  comboStreak = 0;
+  invulnTime = 1.1;
+  flashEl.classList.remove('play');
+  void flashEl.offsetWidth;
+  flashEl.classList.add('play');
+  spawnShatter(ballX(), ballY, ballZ(), 0xff2d55);
+
+  if(lives <= 0){
+    onDeath();
+    return;
+  }
+
+  ballY = surface + 0.01;
+  ballVelY = BOUNCE_VEL;
+  updateBallWorldPos();
   recycleLayers();
 }
 
@@ -925,6 +1056,7 @@ function startGame(){
   titleScreen.classList.add('hidden');
   gameOverScreen.classList.remove('show');
   document.getElementById('hud').classList.add('visible');
+  document.getElementById('livesHud').classList.add('visible');
   resetGame();
   gameState = 'playing';
   setTimeout(()=>{ dragHint.classList.add('show'); setTimeout(()=>dragHint.classList.remove('show'), 2200); }, 400);
@@ -990,6 +1122,8 @@ function animate(now){
   beam.rotation.y += dt*0.2;
 
   if(gameState === 'playing'){
+    if(invulnTime > 0) invulnTime -= dt;
+
     // Sub-step physics when falling fast so gaps are never skipped
     const dy = ballVelY;
     const steps = Math.max(1, Math.ceil(Math.abs(dy * dt) / (LAYER_GAP * 0.45)));
