@@ -177,16 +177,15 @@ const AudioFX = {
     }
 };
 
-// Ring bands — inner gold = 10 pts (generous for 2D)
+// Ring bands — classic archery colors (outer → inner drawn in reverse)
 const RINGS = [
     { max: 0.38, pts: 10, label: 'BULLSEYE!', color: '#ffd700', fill: '#f1c40f', sound: 'bullseye', big: 'BULLSEYE!' },
     { max: 0.56, pts: 7,  label: '+7', color: '#e74c3c', fill: '#e74c3c', sound: 'perfect', big: 'GREAT SHOT!' },
-    { max: 0.74, pts: 5,  label: '+5', color: '#3498db', fill: '#3498db', sound: 'hit' },
-    { max: 0.92, pts: 3,  label: '+3', color: '#34495e', fill: '#2c3e50', sound: 'hit' },
-    { max: 1.00, pts: 1,  label: '+1', color: '#ecf0f1', fill: '#ecf0f1', sound: 'hit' }
+    { max: 0.74, pts: 5,  label: '+5', color: '#2980b9', fill: '#3498db', sound: 'hit' },
+    { max: 0.92, pts: 3,  label: '+3', color: '#1a1a1a', fill: '#2c2c2c', sound: 'hit' },
+    { max: 1.00, pts: 1,  label: '+1', color: '#ffffff', fill: '#f5f5f5', sound: 'hit' }
 ];
-const BULLSEYE_2D_GRACE = 0.08;
-const HIT_SUBSTEPS = 16;
+const BULLSEYE_2D_GRACE = 0.06;
 
 const LEVELS = [
     { goal: 20, arrows: 9, speed: 1.4, wind: 0,    radius: 58 },
@@ -324,19 +323,46 @@ function scoreFromDist(dist, r) {
     return null;
 }
 
-// Deepest point along arrow path inside target — not the outer edge entry
-function findTargetHit(prevX, prevY, x, y, tx, ty, r) {
-    let best = null;
-    for (let s = 1; s <= HIT_SUBSTEPS; s++) {
-        const t = s / HIT_SUBSTEPS;
-        const ix = prevX + (x - prevX) * t;
-        const iy = prevY + (y - prevY) * t;
-        const d = Math.hypot(ix - tx, iy - ty);
-        if (d <= r + 2 && (!best || d < best.dist)) {
-            best = { x: ix, y: iy, dist: d, offX: ix - tx, offY: iy - ty };
-        }
+function registerArrowHit(stickX, stickY, stickAngle, dist) {
+    const ring = scoreFromDist(dist, target.r);
+    if (!ring) return;
+    const offX = stickX - target.x;
+    const offY = stickY - target.y;
+    stuckArrows.push({
+        offX: offX, offY: offY,
+        angle: stickAngle,
+        depth: dist / target.r
+    });
+    gameState.levelScore += ring.pts;
+    gameState.totalScore += ring.pts;
+    AudioFX.play(ring.sound);
+    const rect = canvas.getBoundingClientRect();
+    const sx = rect.left + (stickX / canvas.width) * rect.width;
+    const sy = rect.top + (stickY / canvas.height) * rect.height;
+    showPopup(sx, sy - 20, ring.label + ' +' + ring.pts, ring.color);
+    if (ring.big) showBigPopup(ring.big, ring.color);
+    for (let p = 0; p < 10; p++) {
+        particles.push({
+            x: stickX, y: stickY,
+            vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
+            r: Math.random() * 3 + 1, alpha: 1, color: ring.color
+        });
     }
-    return best;
+    updateHUD();
+    checkEndOfTurn();
+}
+
+function drawArrowGraphic(len, thick) {
+    const L = len || 32;
+    ctx.fillStyle = '#a67c52';
+    ctx.fillRect(-L, -thick / 2, L - 6, thick);
+    ctx.fillStyle = '#444';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(-7, -3.5); ctx.lineTo(-7, 3.5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c0392b';
+    ctx.fillRect(-L, -4, 5, 8);
+    ctx.fillRect(-L + 5, -4, 5, 8);
 }
 
 function canvasPos(clientX, clientY) {
@@ -415,7 +441,10 @@ function handleEnd(e) {
         vx: Math.cos(angle) * force,
         vy: Math.sin(angle) * force,
         angle: angle,
-        flying: true
+        piercing: false,
+        bestDist: Infinity,
+        stickX: 0, stickY: 0, stickAngle: 0,
+        pierceFrames: 0
     });
     gameState.arrows--;
     updateHUD();
@@ -439,50 +468,57 @@ function update() {
 
     for (let i = arrows.length - 1; i >= 0; i--) {
         const a = arrows[i];
-        const prevX = a.x;
-        const prevY = a.y;
-        a.vx += gameState.windX;
-        a.vy += gameState.windY + 0.12;
-        a.x += a.vx;
-        a.y += a.vy;
-        a.angle = Math.atan2(a.vy, a.vx);
+        const tx = target.x, ty = target.y, tr = target.r;
 
-        if (a.y < -60 || a.x < -60 || a.x > canvas.width + 60 || a.y > canvas.height + 60) {
-            arrows.splice(i, 1);
-            checkEndOfTurn();
-            continue;
-        }
+        if (!a.piercing) {
+            a.vx += gameState.windX;
+            a.vy += gameState.windY + 0.12;
+            a.x += a.vx;
+            a.y += a.vy;
+            a.angle = Math.atan2(a.vy, a.vx);
 
-        const hit = findTargetHit(prevX, prevY, a.x, a.y, target.x, target.y, target.r);
-        if (hit) {
-            const ring = scoreFromDist(hit.dist, target.r);
-            if (ring) {
-                stuckArrows.push({
-                    offX: hit.offX, offY: hit.offY,
-                    angle: a.angle,
-                    depth: hit.dist / target.r
-                });
+            if (a.y < -60 || a.x < -60 || a.x > canvas.width + 60 || a.y > canvas.height + 60) {
                 arrows.splice(i, 1);
-
-                gameState.levelScore += ring.pts;
-                gameState.totalScore += ring.pts;
-                AudioFX.play(ring.sound);
-
-                const rect = canvas.getBoundingClientRect();
-                const sx = rect.left + (hit.x / canvas.width) * rect.width;
-                const sy = rect.top + (hit.y / canvas.height) * rect.height;
-                showPopup(sx, sy - 20, ring.label + ' +' + ring.pts, ring.color);
-                if (ring.big) showBigPopup(ring.big, ring.color);
-
-                for (let p = 0; p < 10; p++) {
-                    particles.push({
-                        x: hit.x, y: hit.y,
-                        vx: (Math.random() - 0.5) * 5, vy: (Math.random() - 0.5) * 5,
-                        r: Math.random() * 3 + 1, alpha: 1, color: ring.color
-                    });
-                }
-                updateHUD();
                 checkEndOfTurn();
+                continue;
+            }
+
+            const tipDist = Math.hypot(a.x - tx, a.y - ty);
+            if (tipDist <= tr) {
+                a.piercing = true;
+                a.bestDist = tipDist;
+                a.stickX = a.x; a.stickY = a.y; a.stickAngle = a.angle;
+                a.pierceFrames = 0;
+                a.vx *= 0.25;
+                a.vy *= 0.25;
+            }
+        } else {
+            a.vx += gameState.windX * 0.2;
+            a.vy += gameState.windY * 0.2 + 0.06;
+            a.x += a.vx;
+            a.y += a.vy;
+            a.angle = Math.atan2(a.vy, a.vx);
+            a.pierceFrames++;
+
+            const tipDist = Math.hypot(a.x - tx, a.y - ty);
+            if (tipDist <= tr && tipDist < a.bestDist) {
+                a.bestDist = tipDist;
+                a.stickX = a.x;
+                a.stickY = a.y;
+                a.stickAngle = a.angle;
+            }
+
+            a.vx *= 0.88;
+            a.vy *= 0.88;
+
+            const speed = Math.hypot(a.vx, a.vy);
+            const leftTarget = tipDist > tr;
+            const settled = a.pierceFrames > 2 && speed < 0.35;
+            const timedOut = a.pierceFrames > 18;
+
+            if (leftTarget || settled || timedOut) {
+                registerArrowHit(a.stickX, a.stickY, a.stickAngle, a.bestDist);
+                arrows.splice(i, 1);
             }
         }
     }
@@ -535,51 +571,49 @@ function drawTarget() {
     ctx.save();
     ctx.translate(t.x, t.y);
 
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    // Target stand
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(-4, t.r + 6, 8, 36);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.beginPath();
-    ctx.ellipse(0, t.r + 8, t.r * 0.9, 10, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, t.r + 10, t.r * 0.85, 9, 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Ring face — outer to inner
     for (let i = RINGS.length - 1; i >= 0; i--) {
         ctx.fillStyle = RINGS[i].fill;
         ctx.beginPath();
         ctx.arc(0, 0, t.r * RINGS[i].max, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
     }
 
-    // Center dot — aim here for 10 pts
-    ctx.fillStyle = '#c0392b';
-    ctx.beginPath();
-    ctx.arc(0, 0, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // Ring divider lines
+    RINGS.forEach(ring => {
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, t.r * ring.max, 0, Math.PI * 2);
+        ctx.stroke();
+    });
 
+    // Stuck arrows — drawn ON the face where they actually landed
     stuckArrows.sort((a, b) => b.depth - a.depth);
     stuckArrows.forEach(sa => {
         ctx.save();
         ctx.translate(sa.offX, sa.offY);
         ctx.rotate(sa.angle);
-        ctx.fillStyle = '#8B6914';
-        ctx.fillRect(-30, -2, 30, 4);
-        ctx.fillStyle = '#555';
-        ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.lineTo(-6, -3); ctx.lineTo(-6, 3);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(-34, -5, 6, 10);
-        ctx.fillRect(-34, -1, 6, 10);
+        drawArrowGraphic(30, 3);
         ctx.restore();
     });
 
-    ctx.strokeStyle = '#5d4037';
-    ctx.lineWidth = 6;
+    // Outer wooden rim
+    ctx.strokeStyle = '#4e342e';
+    ctx.lineWidth = 7;
     ctx.beginPath();
-    ctx.arc(0, 0, t.r + 4, 0, Math.PI * 2);
+    ctx.arc(0, 0, t.r + 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#6d4c41';
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
 }
@@ -653,15 +687,7 @@ function drawFlyingArrows() {
         ctx.save();
         ctx.translate(a.x, a.y);
         ctx.rotate(a.angle);
-        ctx.fillStyle = '#8B6914';
-        ctx.fillRect(-30, -2, 30, 4);
-        ctx.fillStyle = '#555';
-        ctx.beginPath();
-        ctx.moveTo(0, 0); ctx.lineTo(-6, -3); ctx.lineTo(-6, 3);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#c0392b';
-        ctx.fillRect(-34, -5, 6, 10);
-        ctx.fillRect(-34, -1, 6, 10);
+        drawArrowGraphic(34, 3);
         ctx.restore();
     });
 }
