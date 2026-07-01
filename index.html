@@ -1035,28 +1035,38 @@ function onDangerHit(l, surface){
 }
 
 /* ---------------- Input (drag to rotate) ---------------- */
+const DRAG_SENS = 0.0155 * Math.min(1.4, Math.max(0.9, innerWidth / 390));
+const ROT_MOMENTUM = 9.5;
+const ROT_DECAY = 0.968;
 let dragActive = false;
 let lastX = 0;
 let dragVelocity = 0;
+let smoothedDragVel = 0;
 
 function onPointerDown(e){
+  if(e.cancelable) e.preventDefault();
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   dragActive = true;
   lastX = x;
   dragVelocity = 0;
+  smoothedDragVel = 0;
+  currentRotVel = 0;
 }
 function onPointerMove(e){
   if(!dragActive) return;
+  if(e.cancelable) e.preventDefault();
   const x = e.touches ? e.touches[0].clientX : e.clientX;
   const dx = x - lastX;
   lastX = x;
-  const rotDelta = dx * 0.0095;
-  TOWER_GROUP.rotation.y += rotDelta;
-  dragVelocity = rotDelta;
+  const instant = dx * DRAG_SENS;
+  smoothedDragVel = smoothedDragVel * 0.55 + instant * 0.45;
+  TOWER_GROUP.rotation.y += instant;
+  dragVelocity = smoothedDragVel;
+  currentRotVel = smoothedDragVel;
 }
 function onPointerUp(){
   dragActive = false;
-  currentRotVel = dragVelocity * 6; // momentum
+  currentRotVel = dragVelocity * ROT_MOMENTUM;
 }
 canvas.addEventListener('touchstart', onPointerDown, {passive:false});
 canvas.addEventListener('touchmove', onPointerMove, {passive:false});
@@ -1166,8 +1176,8 @@ function animate(now){
     }
 
     if(!dragActive){
-      TOWER_GROUP.rotation.y += currentRotVel * dt * 10;
-      currentRotVel *= 0.92;
+      TOWER_GROUP.rotation.y += currentRotVel * dt * 11;
+      currentRotVel *= Math.pow(ROT_DECAY, dt * 60);
     }
 
     if(Math.random() < 0.5) spawnParticle(ball.position.x + (Math.random()-0.5)*0.08, ball.position.y, ball.position.z);
